@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Custom Frame</string>
+    <string name="no_photos">No photos downloaded yet. Check settings.</string>
+    <string name="dropbox_folder">Dropbox Folder (e.g. /Photos/Frame)</string>
+    <string name="dropbox_access_token">Dropbox Access Token</string>
+    <string name="connect_wi_fi">Connect Wi‑Fi</string>
+    <string name="wi_fi_password">Wi‑Fi Password</string>
+    <string name="wi_fi_ssid">Wi‑Fi SSID</string>
+    <string name="newness_weight_alpha">Newness Weight (alpha)</string>
+    <string name="save">Save</string>
+    <string name="enter_network_ssid">Enter network SSID</string>
+    <string name="enter_network_password">Enter network password</string>
+    <string name="enter_dropbox_token">Enter Dropbox token</string>
+    <string name="enter_dropbox_folder">Enter Dropbox folder</string>
+    <string name="no_connection">No connection</string>
+</resources>

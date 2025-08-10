@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/slideshowFragment">
+
+    <fragment
+        android:id="@+id/slideshowFragment"
+        android:name="com.bgradin.customframe.ui.SlideshowFragment"
+        android:label="Slideshow" />
+
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="com.bgradin.customframe.ui.SettingsFragment"
+        android:label="Settings" />
+
+    <fragment
+        android:id="@+id/errorFragment"
+        android:name="com.bgradin.customframe.ui.ErrorFragment"
+        android:label="Error" />
+</navigation>
