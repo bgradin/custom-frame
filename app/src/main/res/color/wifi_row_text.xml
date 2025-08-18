@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- When selected (primary background), use onPrimary -->
+    <item android:state_selected="true" android:color="?attr/colorOnPrimary"/>
+    <!-- Otherwise, use onSurface -->
+    <item android:color="?attr/colorOnSurface"/>
+</selector>

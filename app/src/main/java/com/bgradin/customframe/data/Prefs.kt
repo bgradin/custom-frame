@@ -25,4 +25,8 @@ class Prefs(ctx: Context) {
     var slideIntervalMs: Long
         get() = sp.getLong("slideIntervalMs", 7000)
         set(v) = sp.edit { putLong("slideIntervalMs", v) }
+
+    var lastSyncAt: Long
+        get() = sp.getLong("lastSyncAt", 0L)
+        set(v) = sp.edit { putLong("lastSyncAt", v).apply() }
 }

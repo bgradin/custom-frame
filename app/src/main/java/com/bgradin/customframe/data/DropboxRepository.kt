@@ -1,6 +1,7 @@
 package com.bgradin.customframe.data
 
 import android.content.Context
+import android.util.Log
 import com.dropbox.core.DbxRequestConfig
 import com.dropbox.core.v2.DbxClientV2
 import com.dropbox.core.v2.files.FileMetadata
@@ -50,19 +51,37 @@ class DropboxRepository(private val ctx: Context, token: String) {
         }
         val chosenIds = weightedPick(metas, count, alpha, now).toSet()
         val chosen = all.filter { it.id in chosenIds }
-        val dir = File(ctx.filesDir, "photos").apply { mkdirs() }
+        val dir = photosDir(ctx)
+        Log.i("DropboxRepository", "Saving files to ${dir.absolutePath}...")
 
         val outFiles = mutableListOf<File>()
-        for (m in chosen) {
-            val local = File(dir, m.id.replace(":", "_") + "_" + m.name)
-            ctx.openFileOutput(local.name, Context.MODE_PRIVATE).use { fos ->
+        for ((index, m) in chosen.withIndex()) {
+            val safe = safeName("${m.id}_${m.name}")
+            val local = File(dir, safe)
+            local.parentFile?.mkdirs()
+            Log.i("DropboxRepository", "Downloading image $index of $count -> ${local.absolutePath}")
+
+            val tmp = File(local.parentFile!!, local.name + ".part")
+            tmp.outputStream().use { fos ->
                 client.files().download(m.pathLower).download(fos)
             }
+            if (!tmp.renameTo(local)) {
+                // Fallback if rename fails on some filesystems
+                tmp.copyTo(local, overwrite = true)
+                tmp.delete()
+            }
+
             outFiles += local
             dao.upsert(PhotoEntity(m.id, m.pathLower, existingLastShownAt(dao, m.id), System.currentTimeMillis()))
         }
         return outFiles
     }
+
+    private fun photosDir(ctx: Context) = File(ctx.filesDir, "photos").apply { mkdirs() }
+
+    private fun safeName(raw: String): String =
+        raw.substringAfterLast('/').substringAfterLast('\\')
+            .replace(Regex("""[^A-Za-z0-9._-]"""), "_")
 
     private fun existingLastShownAt(dao: PhotoDao, id: String): Long? = dao.all().find { it.id == id }?.lastShownAt
 }

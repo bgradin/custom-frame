@@ -46,6 +46,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+    implementation("androidx.gridlayout:gridlayout:1.0.0")
 
     // WorkManager (periodic background sync)
     implementation("androidx.work:work-runtime-ktx:2.9.1")

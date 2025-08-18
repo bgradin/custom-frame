@@ -4,7 +4,7 @@
     <string name="no_photos">No photos downloaded yet. Check settings.</string>
     <string name="dropbox_folder">Dropbox Folder (e.g. /Photos/Frame)</string>
     <string name="dropbox_access_token">Dropbox Access Token</string>
-    <string name="connect_wi_fi">Connect Wi‑Fi</string>
+    <string name="connect_wi_fi">Connect</string>
     <string name="wi_fi_password">Wi‑Fi Password</string>
     <string name="wi_fi_ssid">Wi‑Fi SSID</string>
     <string name="newness_weight_alpha">Newness Weight (alpha)</string>
@@ -14,4 +14,22 @@
     <string name="enter_dropbox_token">Enter Dropbox token</string>
     <string name="enter_dropbox_folder">Enter Dropbox folder</string>
     <string name="no_connection">No connection</string>
+    <string name="keySpace">Space</string>
+    <string name="keyDelete">Del</string>
+    <string name="keyClear">Clear</string>
+    <string name="keyMode">Mode</string>
+    <string name="keyCancel">Cancel</string>
+    <string name="keyOk">OK</string>
+    <string name="choose_wi_fi_network">Choose Wi-Fi network</string>
+    <string name="wifi_re_scan">Re-Scan</string>
+    <string name="selected_none">Selected: (none)</string>
+    <string name="wifi_connecting">Connecting…</string>
+    <string name="wifi_connected">Connected!</string>
+    <string name="wifi_connection_failed">Connection failed.</string>
+    <string name="wifi_retry_connection">Retry connection</string>
+    <string name="wifi_re_enter_password">Re-enter password</string>
+    <string name="wifi_choose_different_network">Choose different network</string>
+    <string name="save_saving">Saving…</string>
+    <string name="save_saved">Saved!</string>
+    <string name="slideshow_syncing">Syncing…</string>
 </resources>

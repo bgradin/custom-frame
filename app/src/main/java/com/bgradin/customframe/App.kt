@@ -10,12 +10,14 @@ import java.util.concurrent.TimeUnit
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
+
         // Kick off hourly sync (flex 15 min)
         val req = PeriodicWorkRequestBuilder<PhotoSyncWorker>(1, TimeUnit.HOURS)
+            .addTag(PhotoSyncWorker.WORK_TAG)
             .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "photo-sync",
-            ExistingPeriodicWorkPolicy.KEEP,
+            PhotoSyncWorker.UNIQUE_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
             req
         )
     }

@@ -15,11 +15,24 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp"
-        android:shadowColor="#80000000"
-        android:shadowDx="0"
-        android:shadowDy="0"
-        android:shadowRadius="6"/>
+        android:textSize="12sp"
+        android:textColor="@android:color/white"
+        android:background="#66000000"
+        android:padding="6dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/syncBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/slideshow_syncing"
+        android:textSize="12sp"
+        android:textColor="@android:color/white"
+        android:background="#66000000"
+        android:padding="6dp"
+        android:visibility="gone"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="8dp"/>
 </FrameLayout>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Selected row: filled with primary, rounded corners -->
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp"/>
+            <solid android:color="?attr/colorPrimary"/>
+        </shape>
+    </item>
+
+    <!-- Focused row: transparent fill with primary stroke -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp"/>
+            <solid android:color="@android:color/transparent"/>
+            <stroke android:width="2dp" android:color="?attr/colorPrimary"/>
+        </shape>
+    </item>
+
+    <!-- Default: transparent rounded rect (keeps touch target consistent) -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp"/>
+            <solid android:color="@android:color/transparent"/>
+        </shape>
+    </item>
+</selector>
