@@ -106,6 +106,10 @@ Open Settings with the remote's Settings button.
 2. **Dropbox:** enter an access token with file metadata/content read permissions and a folder such as `/Photos/Frame`. `/` or blank uses the accessible root; subfolders are included. App Folder accounts see their app folder as root. Tokens must be replaced manually when expired or revoked; OAuth sign-in and refresh are not supported.
 3. **Save:** queues sync when credentials change or the last successful sync is over ten minutes old. A blank token disables downloads. Background sync runs roughly hourly with connectivity, subject to Android scheduling.
 
+### Slideshow settings
+
+In the **Slideshow settings** card, **Show blurred background image** is enabled by default. Turn it off to show solid black behind the primary photo. Select **Save** to apply and remember your choice.
+
 ### Time and sleep
 
 The **Time and wake window** card opens system date, time, and time-zone settings. Disable automatic time to set the clock manually. Clock changes apply immediately; save wake-window edits to apply them.
@@ -127,7 +131,7 @@ During scheduled sleep, Power wakes the app until the next window ends; press ag
 | Settings (134)  | Open settings         |
 | Back            | Navigate back         |
 
-Photos advance every ten seconds with a half-second fade, fitted over a dimmed, blurred background. The sync badge shows background work; downloaded photos remain available offline.
+Photos advance every ten seconds with a half-second fade, fitted over a dimmed, blurred background by default. Disable **Show blurred background image** in Settings to use black behind the photo. The sync badge shows background work; downloaded photos remain available offline.
 
 ## Storage and sync
 

@@ -88,6 +88,8 @@ class SettingsFragment : Fragment() {
         wakeStartMinutes = savedInstanceState?.getInt("wakeStart") ?: prefs.wakeStartMinutes
         wakeEndMinutes = savedInstanceState?.getInt("wakeEnd") ?: prefs.wakeEndMinutes
         binding.wakeWindowEnabled.isChecked = savedInstanceState?.getBoolean("wakeEnabled") ?: prefs.wakeWindowEnabled
+        binding.showBlurredBackground.isChecked =
+            savedInstanceState?.getBoolean("showBlurredBackground") ?: prefs.showBlurredBackground
         updateWakeButtons()
         binding.wakeWindowEnabled.setOnCheckedChangeListener { _, _ -> updateWakeButtons() }
         binding.btnWakeStart.setOnClickListener { chooseWakeTime(true) }
@@ -217,6 +219,7 @@ class SettingsFragment : Fragment() {
             outState.putInt("wakeStart", wakeStartMinutes)
             outState.putInt("wakeEnd", wakeEndMinutes)
             outState.putBoolean("wakeEnabled", binding.wakeWindowEnabled.isChecked)
+            outState.putBoolean("showBlurredBackground", binding.showBlurredBackground.isChecked)
         }
     }
 
@@ -276,6 +279,7 @@ class SettingsFragment : Fragment() {
             return
         }
         val limitChanged = prefs.photoSyncLimit != limit
+        prefs.showBlurredBackground = binding.showBlurredBackground.isChecked
         prefs.photoSyncLimit = limit
         prefs.wakeStartMinutes = wakeStartMinutes
         prefs.wakeEndMinutes = wakeEndMinutes

@@ -138,6 +138,9 @@ class SlideshowFragment : Fragment() {
         incoming.animate().cancel()
         outgoing.alpha = 1f
         incoming.alpha = 0f
+        val showBlurredBackground = prefs.showBlurredBackground
+        background.visibility = if (showBlurredBackground) View.VISIBLE else View.GONE
+        val requiredImages = if (showBlurredBackground) 2 else 1
         var readyCount = 0
         var failed = false
         val listener = object : RequestListener<Drawable> {
@@ -166,7 +169,7 @@ class SlideshowFragment : Fragment() {
                         return@post
                     }
                     readyCount++
-                    if (readyCount == 2) {
+                    if (readyCount == requiredImages) {
                         slidesPrepared++
                         if (slidesPrepared % 10 == 0) {
                             AppLog.event("slideshow_progress", "prepared=$slidesPrepared ${AppLog.memory()}")
@@ -195,12 +198,14 @@ class SlideshowFragment : Fragment() {
 
         val metrics = resources.displayMetrics
         // Prepare both images in the hidden container while the current slide stays visible.
-        Glide.with(this).load(file)
-            .override((metrics.widthPixels / 4).coerceAtLeast(1), (metrics.heightPixels / 4).coerceAtLeast(1))
-            .transform(CenterCrop(), SoftwareBlurTransformation())
-            .dontAnimate()
-            .listener(listener)
-            .into(background)
+        if (showBlurredBackground) {
+            Glide.with(this).load(file)
+                .override((metrics.widthPixels / 4).coerceAtLeast(1), (metrics.heightPixels / 4).coerceAtLeast(1))
+                .transform(CenterCrop(), SoftwareBlurTransformation())
+                .dontAnimate()
+                .listener(listener)
+                .into(background)
+        }
         Glide.with(this).load(file)
             .override(metrics.widthPixels, metrics.heightPixels)
             .fitCenter()

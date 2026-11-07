@@ -260,6 +260,31 @@
                 android:padding="24dp"
                 android:layout_marginBottom="20dp"
                 android:background="@drawable/bg_settings_card">
+                <TextView
+                    style="@style/Settings.SectionTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_slideshow_title"/>
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/showBlurredBackground"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:textColor="@color/settings_text"
+                    android:text="@string/show_blurred_background"/>
+                <TextView
+                    style="@style/Settings.Description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/show_blurred_background_help"/>
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_settings_card">
                 <TextView style="@style/Settings.SectionTitle"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:text="@string/settings_time_title"/>

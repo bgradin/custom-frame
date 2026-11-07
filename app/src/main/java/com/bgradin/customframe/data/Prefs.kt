@@ -27,6 +27,10 @@ class Prefs(ctx: Context) {
         get() = sp.getInt("photoSyncLimit", 0).coerceIn(0, 200)
         set(v) = sp.edit { putInt("photoSyncLimit", v.coerceIn(0, 200)) }
 
+    var showBlurredBackground: Boolean
+        get() = sp.getBoolean("showBlurredBackground", true)
+        set(v) = sp.edit { putBoolean("showBlurredBackground", v) }
+
     var lastSyncAt: Long
         get() = sp.getLong("lastSyncAt", 0L)
         set(v) = sp.edit { putLong("lastSyncAt", v).apply() }
