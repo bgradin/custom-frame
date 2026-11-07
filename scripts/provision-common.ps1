@@ -83,16 +83,47 @@ function Set-NixPowerOnly {
     Set-PackageState 'com.kitesystems.nix.prod' 3
 }
 
-function Invoke-Adb {
-    param([string[]]$Arguments)
-    $oldPreference = $ErrorActionPreference
+# ProcessStartInfo.Arguments uses Windows command-line quoting (including paths with spaces).
+function ConvertTo-NativeArgument {
+    param([string]$Value)
+    return '"' + ([regex]::Replace($Value, '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
+}
+
+function Invoke-AdbProcess {
+    param([string[]]$Arguments, [int]$TimeoutSeconds = 60)
+    Write-Host ("ADB: {1}" -f $TimeoutSeconds, ($Arguments -join ' '))
+    $start = New-Object System.Diagnostics.ProcessStartInfo
+    $start.FileName = $script:AdbPath
+    $start.Arguments = ($Arguments | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $start
+    $started = $false
     try {
-        $ErrorActionPreference = 'Continue' # Windows PowerShell wraps native stderr as errors.
-        $result = & $script:AdbPath -s $script:Serial @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $oldPreference }
-    if ($exitCode -ne 0) { throw "ADB failed: $Arguments`n$($result -join "`n")" }
-    return ($result -join "`n").Trim()
+        [void]$process.Start()
+        $started = $true
+        # Drain both pipes concurrently so large dumps cannot fill a pipe and deadlock.
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            $process.Kill()
+            throw "ADB timed out after $TimeoutSeconds seconds: $($Arguments -join ' '). The device operation may still be running; check ADB connectivity before retrying."
+        }
+        $result = ($stdout.GetAwaiter().GetResult() + "`n" + $stderr.GetAwaiter().GetResult()).Trim()
+        if ($process.ExitCode -ne 0) { throw "ADB failed: $($Arguments -join ' ')`n$result" }
+        return $result
+    } finally {
+        if ($started -and -not $process.HasExited) { $process.Kill() }
+        $process.Dispose()
+    }
+}
+
+function Invoke-Adb {
+    param([string[]]$Arguments, [int]$TimeoutSeconds = 60)
+    Invoke-AdbProcess -Arguments (@('-s', $script:Serial) + $Arguments) -TimeoutSeconds $TimeoutSeconds
 }
 
 function Connect-Frame {
@@ -108,13 +139,7 @@ function Connect-Frame {
         $script:AdbPath = Join-Path $sdk 'platform-tools\adb.exe'
     }
     if (-not (Test-Path $script:AdbPath -PathType Leaf)) { throw 'ADB not found. Supply -AdbPath or set ADB_EXE.' }
-    $oldPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = 'Continue'
-        $devices = & $script:AdbPath devices -l 2>&1
-        $exitCode = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $oldPreference }
-    if ($exitCode -ne 0) { throw "Cannot list ADB devices: $devices" }
+    $devices = (Invoke-AdbProcess -Arguments @('devices', '-l')) -split '\r?\n'
     $connected = @($devices | ForEach-Object {
         if ("$_" -match '^(\S+)\s+device(?:\s|$)') { $Matches[1] }
     })

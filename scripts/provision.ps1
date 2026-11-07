@@ -71,7 +71,7 @@ $state | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 $statePath
 Write-Host "Original configuration saved to $statePath"
 
 try {
-    $install = Invoke-Adb @('install', '-r', $apk)
+    $install = Invoke-Adb -Arguments @('install', '-r', $apk) -TimeoutSeconds 180
     if ($install -notmatch '(?m)^Success\s*$') { throw "Install failed: $install" }
     $availableHomes = Invoke-Adb @('shell', 'cmd', 'package', 'query-activities', '--brief', '--user', '0', '-a', 'android.intent.action.MAIN', '-c', 'android.intent.category.HOME')
     if ($availableHomes -notmatch 'com\.bgradin\.customframe/(?:\.MainActivity|com\.bgradin\.customframe\.MainActivity)') {
