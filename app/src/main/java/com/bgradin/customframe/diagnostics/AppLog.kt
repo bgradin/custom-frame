@@ -85,7 +85,7 @@ object AppLog {
     fun failure(error: Throwable): String = errorDetails(error)
 
     fun memory(): String = Runtime.getRuntime().let {
-        "heapUsed=${it.totalMemory() - it.freeMemory()} heapMax=${it.maxMemory()} nativeHeap=${android.os.Debug.getNativeHeapAllocatedSize()}"
+        "heapUsed=${it.totalMemory() - it.freeMemory()} heapMax=${it.maxMemory()} nativeHeap=${android.os.Debug.getNativeHeapAllocatedSize()} blockingGc=${android.os.Debug.getRuntimeStat("art.gc.blocking-gc-count")}"
     }
 
     private fun format(kind: String, detail: String) =

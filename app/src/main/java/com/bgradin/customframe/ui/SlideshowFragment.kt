@@ -9,7 +9,7 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
-import jp.wasabeef.glide.transformations.BlurTransformation
+import com.bgradin.customframe.image.SoftwareBlurTransformation
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -43,6 +43,7 @@ class SlideshowFragment : Fragment() {
     private var index = 0
     private var displayedFront = false
     private var loadGeneration = 0
+    private var slidesPrepared = 0
     private var isLoading = false
     private lateinit var playlist: List<File>
     private var lastSeenSyncAt: Long = 0L
@@ -166,6 +167,10 @@ class SlideshowFragment : Fragment() {
                     }
                     readyCount++
                     if (readyCount == 2) {
+                        slidesPrepared++
+                        if (slidesPrepared % 10 == 0) {
+                            AppLog.event("slideshow_progress", "prepared=$slidesPrepared ${AppLog.memory()}")
+                        }
                         isLoading = false
                         incoming.bringToFront()
                         views.status.bringToFront()
@@ -192,7 +197,7 @@ class SlideshowFragment : Fragment() {
         // Prepare both images in the hidden container while the current slide stays visible.
         Glide.with(this).load(file)
             .override((metrics.widthPixels / 4).coerceAtLeast(1), (metrics.heightPixels / 4).coerceAtLeast(1))
-            .transform(CenterCrop(), BlurTransformation(25, 1))
+            .transform(CenterCrop(), SoftwareBlurTransformation())
             .dontAnimate()
             .listener(listener)
             .into(background)
