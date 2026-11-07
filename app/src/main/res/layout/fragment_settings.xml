@@ -280,6 +280,10 @@
                 <Button android:id="@+id/btnWakeEnd" style="@style/Settings.SecondaryButton"
                     android:layout_width="match_parent" android:layout_height="wrap_content"/>
             </LinearLayout>
+            <Button android:id="@+id/btnApplicationLog"
+                android:text="@string/application_log"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                style="@style/Settings.SecondaryButton"/>
             <Button
                 android:id="@+id/btnSave"
                 android:text="@string/save"

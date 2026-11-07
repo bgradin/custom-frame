@@ -1,5 +1,7 @@
 package com.bgradin.customframe.ui
 
+import com.bgradin.customframe.diagnostics.AppLog
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
@@ -23,6 +25,10 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -61,12 +67,14 @@ class SettingsFragment : Fragment() {
     private val prefs by lazy { Prefs(requireContext()) }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        AppLog.event("settings_open_start", AppLog.memory())
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
         wifiManager = requireContext().applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        AppLog.event("settings_view_created", AppLog.memory())
         inlineKeyboard = InlineKeyboard(binding.root, binding.settingsContent)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -144,6 +152,35 @@ class SettingsFragment : Fragment() {
         wireDpadKeyboard(binding.inputPhotoSyncLimit, getString(R.string.photo_sync_limit))
 
         binding.btnSave.setOnClickListener { saveSettings() }
+        binding.btnApplicationLog.setOnClickListener {
+            val directory = java.io.File(requireContext().filesDir, "diagnostics")
+            viewLifecycleOwner.lifecycleScope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    try {
+                        // Read the current file's tail without allocating the entire journal.
+                        val file = java.io.File(directory, "events.log")
+                        if (!file.exists()) "" else java.io.RandomAccessFile(file, "r").use { input ->
+                            input.seek((input.length() - 32 * 1024).coerceAtLeast(0))
+                            val bytes = ByteArray((input.length() - input.filePointer).toInt())
+                            input.readFully(bytes)
+                            String(bytes, Charsets.UTF_8)
+                        }
+                    } catch (_: Exception) { getString(R.string.application_log_unavailable) }
+                }
+                if (_binding != null) {
+                    val content = TextView(requireContext()).apply {
+                        this.text = text.ifEmpty { getString(R.string.application_log_empty) }
+                        textSize = 12f
+                        setPadding(24, 16, 24, 16)
+                    }
+                    val scroll = android.widget.ScrollView(requireContext()).apply { addView(content) }
+                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.application_log).setView(scroll)
+                        .setPositiveButton(android.R.string.ok, null).show()
+                    scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+                }
+            }
+        }
 
         binding.inputDropboxToken.setText(prefs.dropboxToken)
         binding.inputDropboxFolder.setText(prefs.dropboxFolder)
@@ -258,6 +295,9 @@ class SettingsFragment : Fragment() {
         val folder = binding.inputDropboxFolder.text?.toString().orEmpty().trim().trimEnd('/')
         prefs.dropboxFolder = if (folder.isBlank()) "/" else "/" + folder.trimStart('/')
 
+        AppLog.event("settings_saved", "limit=$limit wakeEnabled=${prefs.wakeWindowEnabled} " +
+            "wakeStart=$wakeStartMinutes wakeEnd=$wakeEndMinutes " +
+            "tokenChanged=${prefs.dropboxToken != oldToken} folderChanged=${prefs.dropboxFolder != oldFolder}")
         val credsChanged = (prefs.dropboxToken != oldToken) || (prefs.dropboxFolder != oldFolder)
         val tenMinMs = java.util.concurrent.TimeUnit.MINUTES.toMillis(10)
         val stale = (System.currentTimeMillis() - prefs.lastSyncAt) > tenMinMs
@@ -317,6 +357,7 @@ class SettingsFragment : Fragment() {
 
     @SuppressLint("MissingPermission")
     private fun startWifiScan() {
+        AppLog.event("wifi_scan_start")
         binding.progressScan.visibility = View.VISIBLE
         val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
         scanReceiver?.let { requireContext().unregisterReceiver(it) }
@@ -353,6 +394,7 @@ class SettingsFragment : Fragment() {
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_WIFI_STATE])
     private fun loadScanResults() {
         val results = wifiManager.scanResults.orEmpty()
+        AppLog.event("wifi_scan_results", "count=${results.size}")
         networks.clear()
 
         val map = mutableMapOf<String, ScanResult>()
@@ -396,6 +438,7 @@ class SettingsFragment : Fragment() {
     // === Connect ===
 
     private fun startConnect() {
+        AppLog.event("wifi_connect_request")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
             return
@@ -487,6 +530,7 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showConnected(show: Boolean) {
+        if (show) AppLog.event("wifi_connected")
         binding.tvConnected.visibility = if (show) View.VISIBLE else View.GONE
         if (show) {
             binding.panelConnError.visibility = View.GONE
@@ -498,6 +542,7 @@ class SettingsFragment : Fragment() {
             binding.panelConnError.visibility = View.GONE
             return
         }
+        AppLog.event("wifi_connect_error")
         binding.panelConnError.visibility = View.VISIBLE
         binding.tvConnError.text = msg
         binding.btnRetry.requestFocus()

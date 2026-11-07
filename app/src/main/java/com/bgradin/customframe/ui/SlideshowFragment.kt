@@ -1,5 +1,7 @@
 package com.bgradin.customframe.ui
 
+import com.bgradin.customframe.diagnostics.AppLog
+
 import android.graphics.drawable.Drawable
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
@@ -107,6 +109,7 @@ class SlideshowFragment : Fragment() {
             ?.sortedBy { it.name }
             ?: emptyList()
         Log.i(TAG, "${playlist.size} files detected")
+        AppLog.event("playlist_loaded", "count=${playlist.size}")
         return playlist
     }
 
@@ -144,7 +147,8 @@ class SlideshowFragment : Fragment() {
                 if (generation == loadGeneration && _binding === views && !failed) {
                     failed = true
                     isLoading = false
-                    Log.w(TAG, "Unable to prepare slide ${file.name}", e)
+                    AppLog.event("slide_load_failed", "index=$index type=${e?.javaClass?.simpleName}")
+                    Log.w(TAG, "Unable to prepare slide", e)
                     scheduleNext()
                 }
                 return false
@@ -184,13 +188,17 @@ class SlideshowFragment : Fragment() {
         Glide.with(this).clear(background)
         Glide.with(this).clear(foreground)
 
+        val metrics = resources.displayMetrics
         // Prepare both images in the hidden container while the current slide stays visible.
         Glide.with(this).load(file)
-            .transform(CenterCrop(), BlurTransformation(25, 4))
+            .override((metrics.widthPixels / 4).coerceAtLeast(1), (metrics.heightPixels / 4).coerceAtLeast(1))
+            .transform(CenterCrop(), BlurTransformation(25, 1))
             .dontAnimate()
             .listener(listener)
             .into(background)
         Glide.with(this).load(file)
+            .override(metrics.widthPixels, metrics.heightPixels)
+            .fitCenter()
             .dontAnimate()
             .listener(listener)
             .into(foreground)
@@ -233,6 +241,7 @@ class SlideshowFragment : Fragment() {
         binding.frontContainer.animate().cancel()
         binding.backContainer.animate().cancel()
         displayedFront = false
+        listOf(binding.frontBg, binding.frontFg, binding.backBg, binding.backFg).forEach { Glide.with(this).clear(it) }
         super.onDestroyView()
         _binding = null
         handler.removeCallbacksAndMessages(null)

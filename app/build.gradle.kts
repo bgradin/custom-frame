@@ -67,6 +67,6 @@ dependencies {
     // OkHttp (Dropbox SDK transports)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Dropbox Core SDK (v5)
-    implementation("com.dropbox.core:dropbox-core-sdk:5.4.4")
+    // SDK 7 includes Dropbox's 2026 API certificate and TLS updates.
+    implementation(libs.dropbox.core.sdk)
 }

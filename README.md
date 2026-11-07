@@ -141,6 +141,25 @@ After all selected downloads succeed, sync deletes images from previous batches,
 
 Selected files are downloaded again on each sync. Replacement needs space for both the old batch and incoming photos; lower the batch limit or free device storage if sync cannot complete. Clearing app data removes photos and settings.
 
+## Troubleshooting and application log
+
+Settings → **Application log** shows the newest 32 KB of the current journal. The app keeps UTC timestamps, device uptime, process IDs, crashes (exception types and stack frames), sync starts/results/retries, settings saves, navigation, boot/update/time broadcasts, screen transitions, hardware power requests, and UI stalls lasting at least five seconds while foreground and interactive. Tokens, passwords, SSIDs, Dropbox paths, photo names, and exception messages are excluded from this journal.
+
+The journal lives in app-private `files/diagnostics/`: `events.log` plus three rotated files, each at most 256 KB (about 1 MB total). It survives updates, process restarts, and reboots; clearing app data or uninstalling removes it. Routine writes use a bounded background queue, which may drop entries under extreme load. Crash writes are synchronous and best effort. Native crashes, abrupt system kills, power loss, or a runtime too stalled to execute the watchdog may leave no final entry; Android's own reports remain important.
+
+From Windows PowerShell, collect diagnostics **before rebooting**:
+
+```powershell
+.\scripts\diagnostics.ps1
+# Optional: -Serial SERIAL -AdbPath C:\path\to\adb.exe -OutputDirectory C:\path\to\report
+```
+
+The script saves all available journal files, Android logcat, retained ANR/crash reports, memory information, and activity state to a timestamped `.diagnostics/` folder. It reads the device without restarting apps or clearing logs. Journal extraction requires a debuggable installed build (`scripts/launch.ps1` installs one); the in-app viewer also works in release builds. Missing rotated files are normal. Android system reports can contain private data from other apps; review collected reports before sharing them.
+
+### Dropbox
+
+Dropbox API connections require Java SDK 7.0.0 or newer for Dropbox's 2026 certificate changes (the app uses the version catalog dependency). Older builds using SDK 5.4.4 can fail during the TLS handshake before token validation. Update the app first; if the journal then reports `InvalidAccessTokenException`, replace the saved Dropbox token in Settings and Save to queue a fresh sync. Failed syncs retain the downloaded collection for offline playback.
+
 ## License
 
 Licensed under the [MIT License](LICENSE). Copyright (c) 2026 Brian Gradin.

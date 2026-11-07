@@ -18,3 +18,4 @@ local.properties
 .aws/
 .codex/
 .kotlin/**/*error*.log
+.diagnostics/

@@ -53,4 +53,7 @@
     <string name="photo_sync_limit_auto">Automatic (leave blank)</string>
     <string name="photo_sync_limit_help">Automatic uses available space at 5 MB per photo, up to 200, reserving 100 MB. Each completed sync replaces the previous photo batch.</string>
     <string name="photo_sync_limit_error">Enter a number from 1 to 200, or leave blank for Automatic.</string>
+    <string name="application_log">Application log</string>
+    <string name="application_log_empty">No application events recorded yet.</string>
+    <string name="application_log_unavailable">Unable to read application log.</string>
 </resources>

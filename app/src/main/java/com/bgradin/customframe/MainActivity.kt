@@ -1,5 +1,7 @@
 package com.bgradin.customframe
 
+import com.bgradin.customframe.diagnostics.AppLog
+
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.appcompat.app.AppCompatActivity
@@ -31,6 +33,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLog.event("activity_create", "restored=${savedInstanceState != null}")
         // Honor a remote wake before evaluating the startup schedule.
         com.bgradin.customframe.power.FramePower.onForeground(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -52,6 +55,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        AppLog.foreground(true)
+        AppLog.event("activity_resume")
         com.bgradin.customframe.power.FramePower.onForeground(this)
         handler.removeCallbacks(scheduleTick)
         scheduleTick.run()
@@ -59,6 +64,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         handler.removeCallbacks(scheduleTick)
+        AppLog.foreground(false)
+        AppLog.event("activity_pause")
         super.onPause()
     }
 
@@ -76,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateDisplay() {
         val wasSleeping = sleeping
         sleeping = com.bgradin.customframe.power.FramePower.apply(this)
+        if (sleeping != wasSleeping) AppLog.event("display", "sleeping=$sleeping")
         if (sleeping && !wasSleeping) focusBeforeSleep = currentFocus
         binding.sleepOverlay.visibility = if (sleeping) android.view.View.VISIBLE else android.view.View.GONE
         binding.navHostFragment.visibility = if (sleeping) android.view.View.INVISIBLE else android.view.View.VISIBLE
@@ -101,7 +109,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateTo(destination: Int) {
+        AppLog.event("navigation_request", "destination=$destination ${AppLog.memory()}")
         val host = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
+        if (supportFragmentManager.isStateSaved || host.navController.currentDestination?.id == destination) return
         host.navController.navigate(destination, null, navOptions {
             launchSingleTop = true
             popUpTo(R.id.slideshowFragment) { inclusive = destination == R.id.slideshowFragment }
@@ -114,7 +124,7 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         if (sleeping) return true
-        if (event.action == KeyEvent.ACTION_DOWN) {
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             when (event.keyCode) {
                 132 -> { // Slideshow
                     navigateTo(R.id.slideshowFragment)

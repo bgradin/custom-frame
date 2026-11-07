@@ -1,5 +1,7 @@
 package com.bgradin.customframe.power
 
+import com.bgradin.customframe.diagnostics.AppLog
+
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.ComponentName
@@ -80,6 +82,7 @@ object FramePower {
         } catch (_: SecurityException) {
             false
         } catch (e: Exception) {
+            AppLog.event("power_profile_error", AppLog.failure(e))
             Log.w("FramePower", "Cannot load power profiles; using display blanking", e)
             false
         }
@@ -96,6 +99,7 @@ object FramePower {
     }
 
     fun reset(context: Context) {
+        AppLog.event("power_override_reset")
         state(context).edit { remove("overrideUntil") }
     }
 
@@ -109,6 +113,7 @@ object FramePower {
     }
 
     fun toggle(context: Context) {
+        AppLog.event("remote_power", "sleeping=${!isSleeping(context)}")
         override(context, !isSleeping(context))
     }
 
@@ -116,6 +121,7 @@ object FramePower {
     fun onForeground(context: Context) {
         if (state(context).getBoolean("hardwareSleeping", false) &&
             state(context).getBoolean("hardwareSleepObserved", false) && interactive(context)) {
+            AppLog.event("remote_wake")
             override(context, false)
             state(context).edit(commit = true) { putBoolean("hardwareSleeping", false) }
             lastRemoteWakeAt = SystemClock.elapsedRealtime()
@@ -129,6 +135,7 @@ object FramePower {
     }
 
     private fun nativePower(context: Context, sleeping: Boolean) {
+        AppLog.event("hardware_power_request", "sleeping=$sleeping")
         val receiver = if (sleeping) "SleepReceiver" else "WakeupReceiver"
         context.sendBroadcast(Intent(if (sleeping) "com.kitesystems.nix.ACTION_SLEEP" else "com.kitesystems.nix.ACTION_WAKEUP")
             .setComponent(ComponentName(NIX, if (sleeping) SLEEP else WAKE))
@@ -165,6 +172,7 @@ object FramePower {
                     alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, alarm)
                 }
             } catch (e: SecurityException) {
+                AppLog.event("power_alarm_error", AppLog.failure(e))
                 Log.w("FramePower", "Exact wake alarm unavailable; using display blanking", e)
             }
         }
