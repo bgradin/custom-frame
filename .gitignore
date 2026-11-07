@@ -17,5 +17,5 @@ local.properties
 .agents/
 .aws/
 .codex/
-.kotlin/**/*error*.log
+.kotlin
 .diagnostics/
