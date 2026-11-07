@@ -30,7 +30,7 @@ class DpadKeyboardDialogFragment : DialogFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setStyle(STYLE_NO_TITLE, android.R.style.Theme_DeviceDefault_Light_NoActionBar_Fullscreen)
+        setStyle(STYLE_NO_TITLE, com.google.android.material.R.style.Theme_MaterialComponents_DayNight_NoActionBar)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -40,11 +40,16 @@ class DpadKeyboardDialogFragment : DialogFragment() {
         rows = v.findViewById(R.id.rowContainer)
 
         buffer.clear()
-        buffer.append(initialText)
-        title.text = titleText
+        buffer.append(savedInstanceState?.getString("buffer") ?: arguments?.getString("initial").orEmpty())
+        title.text = arguments?.getString("title").orEmpty()
         updatePreview()
         buildKeyboard()
         return v
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("buffer", buffer.toString())
+        super.onSaveInstanceState(outState)
     }
 
     private fun updatePreview() { preview.text = buffer.toString() }
@@ -60,7 +65,7 @@ class DpadKeyboardDialogFragment : DialogFragment() {
         // Keep focus on the requested control if provided; otherwise first character key
         val target = pendingFocusTag?.let { rows.findViewWithTag<View>(it) }
             ?: rows.findViewWithTag("firstKey")
-        target.requestFocus()
+        target?.requestFocus()
     }
 
     private fun buildAlphaRows() {
@@ -218,8 +223,10 @@ class DpadKeyboardDialogFragment : DialogFragment() {
     companion object {
         fun newInstance(title: String, initial: String, onCommit: (String) -> Unit): DpadKeyboardDialogFragment {
             return DpadKeyboardDialogFragment().apply {
-                this.initialText = initial
-                this.titleText = title
+                arguments = Bundle().apply {
+                    putString("initial", initial)
+                    putString("title", title)
+                }
                 this.onCommit = onCommit
             }
         }

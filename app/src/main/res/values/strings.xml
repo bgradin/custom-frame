@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Custom Frame</string>
-    <string name="no_photos">No photos downloaded yet. Check settings.</string>
+    <string name="no_photos">No photos yet. Open Settings, add your Dropbox token and folder, then Save to sync.</string>
     <string name="dropbox_folder">Dropbox Folder (e.g. /Photos/Frame)</string>
     <string name="dropbox_access_token">Dropbox Access Token</string>
     <string name="connect_wi_fi">Connect</string>
     <string name="wi_fi_password">Wi‑Fi Password</string>
     <string name="wi_fi_ssid">Wi‑Fi SSID</string>
     <string name="newness_weight_alpha">Newness Weight (alpha)</string>
-    <string name="save">Save</string>
+    <string name="save">Save settings</string>
     <string name="enter_network_ssid">Enter network SSID</string>
     <string name="enter_network_password">Enter network password</string>
     <string name="enter_dropbox_token">Enter Dropbox token</string>
@@ -32,4 +32,25 @@
     <string name="save_saving">Saving…</string>
     <string name="save_saved">Saved!</string>
     <string name="slideshow_syncing">Syncing…</string>
+    <string name="settings_title">Frame settings</string>
+    <string name="settings_help">Connect your frame and choose your photos. Select a text field to type with your remote.</string>
+    <string name="slideshow_paused">Paused · Press center to resume</string>
+    <string name="settings_network_title">Wi-Fi connection</string>
+    <string name="settings_network_help">Choose a network. On Android 10 and later, Connect opens system Wi-Fi settings.</string>
+    <string name="settings_photos_title">Photo library</string>
+    <string name="settings_photos_help">Connect Dropbox and choose the folder for your slideshow. Subfolders are included.</string>
+    <string name="keyShift">Shift</string>
+    <string name="keyBackspace">Delete</string>
+    <string name="keyDone">Done</string>
+    <string name="settings_time_title">Time and wake window</string>
+    <string name="system_time_settings">Change system date, time or time zone</string>
+    <string name="system_time_unavailable">System date and time settings are unavailable on this device.</string>
+    <string name="wake_window_enabled">Use a daily wake window</string>
+    <string name="wake_window_help">Outside these local hours the screen sleeps. Hardware power-off requires the frame setup; otherwise the display goes black at minimum brightness. Press Power to wake it until the next window ends. Overnight windows are supported; matching times mean all day. Save to apply.</string>
+    <string name="wake_start">Wake at %1$s</string>
+    <string name="wake_end">Sleep at %1$s</string>
+    <string name="photo_sync_limit">Photos per sync (1–200)</string>
+    <string name="photo_sync_limit_auto">Automatic (leave blank)</string>
+    <string name="photo_sync_limit_help">Automatic uses available space at 5 MB per photo, up to 200, reserving 100 MB. Each completed sync replaces the previous photo batch.</string>
+    <string name="photo_sync_limit_error">Enter a number from 1 to 200, or leave blank for Automatic.</string>
 </resources>

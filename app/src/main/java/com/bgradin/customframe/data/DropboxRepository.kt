@@ -9,6 +9,8 @@ import com.dropbox.core.v2.files.ListFolderErrorException
 import com.dropbox.core.v2.files.ListFolderResult
 import com.bgradin.customframe.util.PhotoMeta
 import com.bgradin.customframe.util.weightedPick
+import com.bgradin.customframe.util.PhotoStorage
+import java.io.IOException
 import java.io.File
 
 class DropboxRepository(private val ctx: Context, token: String) {
@@ -29,7 +31,7 @@ class DropboxRepository(private val ctx: Context, token: String) {
             }
         }
         try {
-            var result = client.files().listFolderBuilder(path).withRecursive(true).start()
+            var result = client.files().listFolderBuilder(path.trim().trimEnd('/')).withRecursive(true).start()
             collect(result)
             while (result.hasMore) {
                 result = client.files().listFolderContinue(result.cursor)
@@ -41,12 +43,13 @@ class DropboxRepository(private val ctx: Context, token: String) {
         return photos
     }
 
-    fun chooseAndDownloadBatch(all: List<FileMetadata>, alpha: Double, count: Int = 200): List<File> {
+    fun chooseAndDownloadBatch(all: List<FileMetadata>, alpha: Double, count: Int): List<File> {
         val dao = AppDb.get(ctx).photoDao()
         val now = System.currentTimeMillis()
+        val history = dao.all().associateBy { it.id }
         val metas = all.map { f ->
             val id = f.id
-            val existing = dao.all().find { it.id == id }
+            val existing = history[id]
             PhotoMeta(id, existing?.lastShownAt)
         }
         val chosenIds = weightedPick(metas, count, alpha, now).toSet()
@@ -61,9 +64,19 @@ class DropboxRepository(private val ctx: Context, token: String) {
             local.parentFile?.mkdirs()
             Log.i("DropboxRepository", "Downloading image $index of $count -> ${local.absolutePath}")
 
+            // Remove an interrupted download before checking space for its replacement.
             val tmp = File(local.parentFile!!, local.name + ".part")
-            tmp.outputStream().use { fos ->
-                client.files().download(m.pathLower).download(fos)
+            if (tmp.exists() && !tmp.delete()) throw IOException("Cannot remove partial download")
+            if (!PhotoStorage.canDownload(dir.usableSpace, m.size)) {
+                throw IOException("Insufficient photo storage; preserving previous batch")
+            }
+            try {
+                tmp.outputStream().use { fos ->
+                    client.files().download(m.id).use { downloader -> downloader.download(fos) }
+                }
+            } catch (e: Exception) {
+                tmp.delete()
+                throw e
             }
             if (!tmp.renameTo(local)) {
                 // Fallback if rename fails on some filesystems
@@ -72,8 +85,12 @@ class DropboxRepository(private val ctx: Context, token: String) {
             }
 
             outFiles += local
-            dao.upsert(PhotoEntity(m.id, m.pathLower, existingLastShownAt(dao, m.id), System.currentTimeMillis()))
+            dao.upsert(PhotoEntity(m.id, local.name, history[m.id]?.lastShownAt, System.currentTimeMillis()))
         }
+        PhotoStorage.cleanup(dir, outFiles.map { it.name }.toSet())
+        // Keep display history for future sampling, but drop records deleted from Dropbox.
+        val currentIds = all.map { it.id }.toSet()
+        history.keys.filter { it !in currentIds }.forEach { dao.delete(it) }
         return outFiles
     }
 
@@ -83,5 +100,4 @@ class DropboxRepository(private val ctx: Context, token: String) {
         raw.substringAfterLast('/').substringAfterLast('\\')
             .replace(Regex("""[^A-Za-z0-9._-]"""), "_")
 
-    private fun existingLastShownAt(dao: PhotoDao, id: String): Long? = dao.all().find { it.id == id }?.lastShownAt
 }

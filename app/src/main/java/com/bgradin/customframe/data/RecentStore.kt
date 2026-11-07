@@ -6,13 +6,18 @@ import androidx.room.*
 @Entity(tableName = "photos")
 data class PhotoEntity(
     @PrimaryKey val id: String, // Dropbox file id (or path)
-    val pathLower: String,
+    @ColumnInfo(name = "pathLower") val localFilename: String,
     val lastShownAt: Long?,
     val lastDownloadedAt: Long?
 )
 
 @Dao
 interface PhotoDao {
+    @Query("UPDATE photos SET lastShownAt = :shownAt WHERE pathLower = :filename")
+    fun markShown(filename: String, shownAt: Long)
+
+    @Query("DELETE FROM photos WHERE id = :id") fun delete(id: String)
+
     @Query("SELECT * FROM photos") fun all(): List<PhotoEntity>
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun upsertAll(items: List<PhotoEntity>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun upsert(item: PhotoEntity)

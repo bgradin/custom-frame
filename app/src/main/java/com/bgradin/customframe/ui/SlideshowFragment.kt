@@ -1,17 +1,28 @@
 package com.bgradin.customframe.ui
 
+import android.graphics.drawable.Drawable
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import jp.wasabeef.glide.transformations.BlurTransformation
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.bgradin.customframe.data.AppDb
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bgradin.customframe.R
 import com.bgradin.customframe.data.Prefs
 import com.bgradin.customframe.databinding.FragmentSlideshowBinding
@@ -25,10 +36,13 @@ class SlideshowFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val handler = Handler(Looper.getMainLooper())
+    private val nextRunnable = Runnable { next() }
     private var isPlaying = true
     private var index = 0
+    private var displayedFront = false
+    private var loadGeneration = 0
+    private var isLoading = false
     private lateinit var playlist: List<File>
-    private val photoFiles = mutableListOf<File>()
     private var lastSeenSyncAt: Long = 0L
     private val prefs by lazy { Prefs(requireContext().applicationContext) }
 
@@ -42,6 +56,8 @@ class SlideshowFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // The initial playlist already includes the last completed sync.
+        lastSeenSyncAt = prefs.lastSyncAt
         val wm = WorkManager.getInstance(requireContext())
         wm.getWorkInfosByTagLiveData(PhotoSyncWorker.WORK_TAG)
             .observe(viewLifecycleOwner) { infos ->
@@ -52,32 +68,32 @@ class SlideshowFragment : Fragment() {
                 val now = prefs.lastSyncAt
                 if (!syncing && now > lastSeenSyncAt) {
                     lastSeenSyncAt = now
-                    // tiny post to let file writes settle
-                    view.post {
-                        playlist = loadPlaylist()
-                        showCurrent()
-                        scheduleNext()
-                    }
+                    playlist = loadPlaylist()
+                    index = 0
+                    showCurrent()
                 }
             }
 
         playlist = loadPlaylist()
         showCurrent()
-        scheduleNext()
 
         binding.root.isFocusableInTouchMode = true
         binding.root.requestFocus()
-        binding.root.setOnKeyListener { _, keyCode, _ ->
+        binding.root.setOnKeyListener { _, keyCode, event ->
+            if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) {
+                return@setOnKeyListener false
+            }
+
             when (keyCode) {
-                23 -> { // Play/accept
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                     isPlaying = !isPlaying
-                    if (isPlaying) scheduleNext() else handler.removeCallbacksAndMessages(null)
+                    if (isPlaying) scheduleNext() else handler.removeCallbacks(nextRunnable)
+                    binding.status.text = getString(R.string.slideshow_paused)
+                    binding.status.visibility = if (isPlaying) View.GONE else View.VISIBLE
                     true
                 }
                 21 -> { prev(); true }
-                22 -> { next(true); true }
-                24 -> { adjustInterval(-1000); true }
-                25 -> { adjustInterval(+1000); true }
+                22 -> { next(); true }
                 else -> false
             }
         }
@@ -95,27 +111,103 @@ class SlideshowFragment : Fragment() {
     }
 
     private fun showCurrent() {
+        handler.removeCallbacks(nextRunnable)
         if (playlist.isEmpty()) {
+            ++loadGeneration
+            isLoading = false
             binding.status.text = getString(R.string.no_photos)
+            binding.status.visibility = View.VISIBLE;
             return
         }
-        val file = playlist[index % playlist.size]
-        Glide.with(this)
-            .load(file)
-            .transition(DrawableTransitionOptions.withCrossFade(500))
-            .into(binding.image)
-        binding.status.text = "${index+1}/${playlist.size}"
+
+        val generation = ++loadGeneration
+        isLoading = true
+        index = index.coerceIn(0, playlist.lastIndex)
+        val file = playlist[index]
+        val views = binding
+        val outgoing = if (displayedFront) views.frontContainer else views.backContainer
+        val incoming = if (displayedFront) views.backContainer else views.frontContainer
+        val background = if (displayedFront) views.backBg else views.frontBg
+        val foreground = if (displayedFront) views.backFg else views.frontFg
+
+        outgoing.animate().cancel()
+        incoming.animate().cancel()
+        outgoing.alpha = 1f
+        incoming.alpha = 0f
+        var readyCount = 0
+        var failed = false
+        val listener = object : RequestListener<Drawable> {
+            override fun onLoadFailed(
+                e: GlideException?, model: Any?, target: Target<Drawable>,
+                isFirstResource: Boolean
+            ): Boolean {
+                if (generation == loadGeneration && _binding === views && !failed) {
+                    failed = true
+                    isLoading = false
+                    Log.w(TAG, "Unable to prepare slide ${file.name}", e)
+                    scheduleNext()
+                }
+                return false
+            }
+
+            override fun onResourceReady(
+                resource: Drawable, model: Any, target: Target<Drawable>?,
+                dataSource: DataSource, isFirstResource: Boolean
+            ): Boolean {
+                // Glide invokes listeners before setting the ImageView drawable.
+                // Post the transition so both targets have received their images.
+                views.root.post {
+                    if (generation != loadGeneration || _binding !== views || failed) {
+                        return@post
+                    }
+                    readyCount++
+                    if (readyCount == 2) {
+                        isLoading = false
+                        incoming.bringToFront()
+                        views.status.bringToFront()
+                        views.syncBadge.bringToFront()
+                        displayedFront = incoming === views.frontContainer
+                        incoming.animate().alpha(1f).setDuration(500).start()
+                        val db = AppDb.get(requireContext())
+                        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                            db.photoDao().markShown(file.name, System.currentTimeMillis())
+                        }
+                        scheduleNext()
+                    }
+                }
+                return false
+            }
+        }
+
+        // Equivalent Glide requests reuse their original listeners. Clear the hidden
+        // targets so a reload of the same file gets this generation's callbacks.
+        Glide.with(this).clear(background)
+        Glide.with(this).clear(foreground)
+
+        // Prepare both images in the hidden container while the current slide stays visible.
+        Glide.with(this).load(file)
+            .transform(CenterCrop(), BlurTransformation(25, 4))
+            .dontAnimate()
+            .listener(listener)
+            .into(background)
+        Glide.with(this).load(file)
+            .dontAnimate()
+            .listener(listener)
+            .into(foreground)
+
+        binding.status.text = getString(R.string.slideshow_paused)
+        binding.status.visibility = if (isPlaying) View.GONE else View.VISIBLE
     }
 
     private fun scheduleNext() {
-        if (!isPlaying) return
-        handler.postDelayed({ next(false) }, Prefs(requireContext()).slideIntervalMs)
+        if (!isPlaying || !isResumed || isLoading || playlist.isEmpty()) return
+        handler.removeCallbacks(nextRunnable)
+        handler.postDelayed(nextRunnable, 10000)
     }
 
-    private fun next(manual: Boolean) {
+    private fun next() {
         index = (index + 1) % (playlist.size.coerceAtLeast(1))
         showCurrent()
-        if (isPlaying && !manual) scheduleNext()
     }
 
     private fun prev() {
@@ -123,12 +215,24 @@ class SlideshowFragment : Fragment() {
         showCurrent()
     }
 
-    private fun adjustInterval(delta: Long) {
-        val p = Prefs(requireContext())
-        p.slideIntervalMs = (p.slideIntervalMs + delta).coerceIn(2000, 30000)
+    override fun onResume() {
+        super.onResume()
+        binding.root.keepScreenOn = true
+        scheduleNext()
+    }
+
+    override fun onPause() {
+        handler.removeCallbacks(nextRunnable)
+        binding.root.keepScreenOn = false
+        super.onPause()
     }
 
     override fun onDestroyView() {
+        ++loadGeneration
+        isLoading = false
+        binding.frontContainer.animate().cancel()
+        binding.backContainer.animate().cancel()
+        displayedFront = false
         super.onDestroyView()
         _binding = null
         handler.removeCallbacksAndMessages(null)

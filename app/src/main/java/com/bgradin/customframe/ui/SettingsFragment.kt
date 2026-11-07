@@ -9,7 +9,6 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.*
 import android.net.wifi.ScanResult
-import android.net.wifi.WifiNetworkSpecifier
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.os.Build
@@ -21,9 +20,11 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.work.ExistingWorkPolicy
@@ -39,7 +40,13 @@ class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val binding get() = _binding!!
 
+    private var wakeStartMinutes = 0
+    private var wakeEndMinutes = 0
+
+    private var inlineKeyboard: InlineKeyboard? = null
+
     private lateinit var wifiManager: WifiManager
+    private val scanHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var scanReceiver: BroadcastReceiver? = null
     private val networks = mutableListOf<WifiItem>()
     private lateinit var adapter: NetworksAdapter
@@ -60,6 +67,33 @@ class SettingsFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        inlineKeyboard = InlineKeyboard(binding.root, binding.settingsContent)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (inlineKeyboard?.close() != true) {
+                    isEnabled = false
+                    requireActivity().onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
+        wakeStartMinutes = savedInstanceState?.getInt("wakeStart") ?: prefs.wakeStartMinutes
+        wakeEndMinutes = savedInstanceState?.getInt("wakeEnd") ?: prefs.wakeEndMinutes
+        binding.wakeWindowEnabled.isChecked = savedInstanceState?.getBoolean("wakeEnabled") ?: prefs.wakeWindowEnabled
+        updateWakeButtons()
+        binding.wakeWindowEnabled.setOnCheckedChangeListener { _, _ -> updateWakeButtons() }
+        binding.btnWakeStart.setOnClickListener { chooseWakeTime(true) }
+        binding.btnWakeEnd.setOnClickListener { chooseWakeTime(false) }
+        binding.btnSystemTime.setOnClickListener {
+            try {
+                startActivity(Intent(android.provider.Settings.ACTION_DATE_SETTINGS))
+            } catch (_: android.content.ActivityNotFoundException) {
+                Toast.makeText(requireContext(), R.string.system_time_unavailable, Toast.LENGTH_LONG).show()
+            } catch (_: SecurityException) {
+                Toast.makeText(requireContext(), R.string.system_time_unavailable, Toast.LENGTH_LONG).show()
+            }
+        }
+        applyFocusMotion(view)
         // Prefill saved password if any
         val savedPw = prefs.wifiPassword
         if (savedPw.isNotBlank()) {
@@ -94,11 +128,7 @@ class SettingsFragment : Fragment() {
         // Error panel actions
         binding.btnRetry.setOnClickListener { startConnect() }
         binding.btnReenter.setOnClickListener { // open keyboard
-            DpadKeyboardDialogFragment
-                .newInstance("Wi‑Fi Password", binding.inputWifiPassword.text?.toString() ?: "") { newText ->
-                    binding.inputWifiPassword.setText(newText)
-                }
-                .show(parentFragmentManager, "dpadkbd")
+            inlineKeyboard?.open(binding.inputWifiPassword, getString(R.string.wi_fi_password))
         }
         binding.btnChooseDifferent.setOnClickListener {
             showError(null)
@@ -108,14 +138,16 @@ class SettingsFragment : Fragment() {
         // Optional: auto-scan on entry
         ensureLocationAndScan()
 
-        wireDpadKeyboard(binding.inputWifiPassword, "Wi‑Fi Password")
-        wireDpadKeyboard(binding.inputDropboxToken, "Dropbox Access Token")
-        wireDpadKeyboard(binding.inputDropboxFolder, "Dropbox Folder")
+        wireDpadKeyboard(binding.inputWifiPassword, getString(R.string.wi_fi_password))
+        wireDpadKeyboard(binding.inputDropboxToken, getString(R.string.dropbox_access_token))
+        wireDpadKeyboard(binding.inputDropboxFolder, getString(R.string.dropbox_folder))
+        wireDpadKeyboard(binding.inputPhotoSyncLimit, getString(R.string.photo_sync_limit))
 
         binding.btnSave.setOnClickListener { saveSettings() }
 
         binding.inputDropboxToken.setText(prefs.dropboxToken)
         binding.inputDropboxFolder.setText(prefs.dropboxFolder)
+        binding.inputPhotoSyncLimit.setText(prefs.photoSyncLimit.takeIf { it > 0 }?.toString().orEmpty())
 
         val rv = binding.rvNetworks
         val listener = ViewTreeObserver.OnGlobalFocusChangeListener { _, newFocus ->
@@ -136,6 +168,59 @@ class SettingsFragment : Fragment() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        binding.currentTime.text = java.text.SimpleDateFormat("EEE, d MMM yyyy HH:mm z", java.util.Locale.getDefault())
+            .format(java.util.Date())
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (_binding != null) {
+            outState.putInt("wakeStart", wakeStartMinutes)
+            outState.putInt("wakeEnd", wakeEndMinutes)
+            outState.putBoolean("wakeEnabled", binding.wakeWindowEnabled.isChecked)
+        }
+    }
+
+    private fun updateWakeButtons() {
+        fun time(minutes: Int) = String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes / 60, minutes % 60)
+        binding.btnWakeStart.text = getString(R.string.wake_start, time(wakeStartMinutes))
+        binding.btnWakeEnd.text = getString(R.string.wake_end, time(wakeEndMinutes))
+        binding.btnWakeStart.isEnabled = binding.wakeWindowEnabled.isChecked
+        binding.btnWakeEnd.isEnabled = binding.wakeWindowEnabled.isChecked
+    }
+
+    private fun chooseWakeTime(start: Boolean) {
+        val minutes = if (start) wakeStartMinutes else wakeEndMinutes
+        android.app.TimePickerDialog(requireContext(), { _, hour, minute ->
+            if (_binding != null) {
+                if (start) wakeStartMinutes = hour * 60 + minute else wakeEndMinutes = hour * 60 + minute
+                updateWakeButtons()
+            }
+        }, minutes / 60, minutes % 60, true).show()
+    }
+
+    private fun applyFocusMotion(view: View) {
+        // Scrolling rows must stay inside the network selector's viewport.
+        if (view is RecyclerView) {
+            view.clipChildren = true
+            view.clipToPadding = true
+            return
+        }
+        if (view is ViewGroup) {
+            view.clipChildren = false
+            view.clipToPadding = false
+            for (index in 0 until view.childCount) applyFocusMotion(view.getChildAt(index))
+        }
+        if (view is android.widget.Button || view is android.widget.EditText) {
+            view.setOnFocusChangeListener { control, focused ->
+                control.animate().scaleX(if (focused) 1.025f else 1f)
+                    .scaleY(if (focused) 1.025f else 1f).setDuration(140).start()
+            }
+        }
+    }
+
     private fun isDescendant(parent: View, child: View?): Boolean {
         var v = child
         while (v is View) {
@@ -146,22 +231,40 @@ class SettingsFragment : Fragment() {
     }
 
     private fun saveSettings() {
+        val limitText = binding.inputPhotoSyncLimit.text?.toString().orEmpty().trim()
+        val limit = if (limitText.isEmpty()) 0 else limitText.toIntOrNull()
+        if (limit == null || (limitText.isNotEmpty() && limit !in 1..200)) {
+            binding.inputPhotoSyncLimit.error = getString(R.string.photo_sync_limit_error)
+            binding.inputPhotoSyncLimit.requestFocus()
+            return
+        }
+        val limitChanged = prefs.photoSyncLimit != limit
+        prefs.photoSyncLimit = limit
+        prefs.wakeStartMinutes = wakeStartMinutes
+        prefs.wakeEndMinutes = wakeEndMinutes
+        prefs.wakeWindowEnabled = binding.wakeWindowEnabled.isChecked
+        (requireActivity() as com.bgradin.customframe.MainActivity).wakeSettingsChanged()
         // persist wifi credentials
-        prefs.wifiSsid = selected?.ssid ?: ""
-        prefs.wifiPassword = if (selected?.security != Security.OPEN)
-            binding.inputWifiPassword.text?.toString().orEmpty() else ""
+        prefs.wifiSsid = selected?.ssid ?: prefs.wifiSsid
+        if (selected != null) {
+            prefs.wifiPassword = if (selected?.security != Security.OPEN)
+                binding.inputWifiPassword.text?.toString().orEmpty() else ""
+        }
 
         val oldToken = prefs.dropboxToken
         val oldFolder = prefs.dropboxFolder
 
-        prefs.dropboxToken = binding.inputDropboxToken.text?.toString().orEmpty()
-        prefs.dropboxFolder = binding.inputDropboxFolder.text?.toString().orEmpty()
+        prefs.dropboxToken = binding.inputDropboxToken.text?.toString().orEmpty().trim()
+        val folder = binding.inputDropboxFolder.text?.toString().orEmpty().trim().trimEnd('/')
+        prefs.dropboxFolder = if (folder.isBlank()) "/" else "/" + folder.trimStart('/')
 
         val credsChanged = (prefs.dropboxToken != oldToken) || (prefs.dropboxFolder != oldFolder)
         val tenMinMs = java.util.concurrent.TimeUnit.MINUTES.toMillis(10)
         val stale = (System.currentTimeMillis() - prefs.lastSyncAt) > tenMinMs
-        if (credsChanged || stale || true) {
+        if (prefs.dropboxToken.isNotBlank() && (credsChanged || limitChanged || stale)) {
             val nowReq = OneTimeWorkRequestBuilder<PhotoSyncWorker>()
+                .setConstraints(androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
                 .addTag(PhotoSyncWorker.WORK_TAG)
                 .build()
             WorkManager.getInstance(requireContext().applicationContext)
@@ -175,10 +278,13 @@ class SettingsFragment : Fragment() {
             Toast.makeText(requireContext(), "Settings saved", Toast.LENGTH_SHORT).show()
         }
 
-        activity?.supportFragmentManager?.popBackStack()
+        findNavController().popBackStack()
     }
 
     private fun selectNetwork(item: WifiItem) {
+        if (selected?.ssid != item.ssid) {
+            binding.inputWifiPassword.setText(if (prefs.wifiSsid == item.ssid) prefs.wifiPassword else "")
+        }
         selected = item
         adapter.setSelected(item.ssid)
 
@@ -196,14 +302,14 @@ class SettingsFragment : Fragment() {
                 }
             }
             // Keep your D-pad keyboard
-            wireDpadKeyboard(binding.inputWifiPassword, "Wi-Fi Password")
+            wireDpadKeyboard(binding.inputWifiPassword, getString(R.string.wi_fi_password))
         }
     }
 
     private fun ensureLocationAndScan() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
             != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQ_LOC)
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), REQ_LOC)
             return
         }
         startWifiScan()
@@ -216,6 +322,7 @@ class SettingsFragment : Fragment() {
         scanReceiver?.let { requireContext().unregisterReceiver(it) }
         scanReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                scanHandler.removeCallbacksAndMessages(null)
                 binding.progressScan.visibility = View.GONE
                 loadScanResults()
                 // Unregister after one batch to keep things simple
@@ -223,12 +330,23 @@ class SettingsFragment : Fragment() {
                 scanReceiver = null
             }
         }
-        requireContext().registerReceiver(scanReceiver, filter)
+        ContextCompat.registerReceiver(requireContext(), scanReceiver, filter, ContextCompat.RECEIVER_EXPORTED)
+        scanHandler.removeCallbacksAndMessages(null)
+        scanHandler.postDelayed({
+            if (_binding != null) {
+                binding.progressScan.visibility = View.GONE
+                loadScanResults()
+                scanReceiver?.let { requireContext().unregisterReceiver(it) }
+                scanReceiver = null
+            }
+        }, 15000)
         val ok = wifiManager.startScan()
         if (!ok) {
             // Even if startScan() returns false, you may still get cached results
             binding.progressScan.visibility = View.GONE
             loadScanResults()
+            scanReceiver?.let { requireContext().unregisterReceiver(it) }
+            scanReceiver = null
         }
     }
 
@@ -270,22 +388,32 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_LOC && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) startWifiScan()
+    }
+
     // === Connect ===
 
     private fun startConnect() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
+            return
+        }
         val item = selected
         if (item == null) {
             Toast.makeText(requireContext(), "Choose a network first", Toast.LENGTH_SHORT).show()
             return
         }
+        if (item.security == Security.ENTERPRISE || item.security == Security.WPA3) {
+            showError("This network requires system Wi-Fi settings.")
+            startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
+            return
+        }
         val pw = binding.inputWifiPassword.text?.toString().orEmpty()
         if (item.security != Security.OPEN && pw.isEmpty()) {
             Toast.makeText(requireContext(), "Enter password", Toast.LENGTH_SHORT).show()
-            DpadKeyboardDialogFragment
-                .newInstance("Wi‑Fi Password", binding.inputWifiPassword.text?.toString() ?: "") { newText ->
-                    binding.inputWifiPassword.setText(newText)
-                }
-                .show(parentFragmentManager, "dpadkbd")
+            inlineKeyboard?.open(binding.inputWifiPassword, getString(R.string.wi_fi_password))
             return
         }
 
@@ -295,53 +423,10 @@ class SettingsFragment : Fragment() {
         showError(null)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Specifier = temporary network for the app (good for our frame use)
-            val specBuilder = WifiNetworkSpecifier.Builder().setSsid(item.ssid)
-            when (item.security) {
-                Security.OPEN -> { /* nothing */ }
-                Security.WPA2, Security.WPA3, Security.WPA_MIXED -> {
-                    // Use WPA2 by default; WPA3 requires platform support
-                    specBuilder.setWpa2Passphrase(pw)
-                }
-                Security.WEP -> {
-                    // WEP is deprecated and not supported by specifier
-                    showError("WEP networks are not supported on this Android version.")
-                    showConnecting(false); return
-                }
-            }
-            val request = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) // optional; set if AP lacks internet
-                .setNetworkSpecifier(specBuilder.build())
-                .build()
-
-            pendingCallback?.let { cm.unregisterNetworkCallback(it) }
-            val cb = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    // Optionally bind process to verify connectivity / download test
-                    cm.bindProcessToNetwork(network)
-                    requireActivity().runOnUiThread {
-                        showConnecting(false)
-                        showConnected(true)
-                    }
-                }
-                override fun onUnavailable() {
-                    requireActivity().runOnUiThread {
-                        showConnecting(false)
-                        showError("Unable to connect.")
-                    }
-                }
-                override fun onLost(network: Network) {
-                    requireActivity().runOnUiThread {
-                        showConnected(false)
-                        showError("Connection lost.")
-                    }
-                }
-            }
-            pendingCallback = cb
-            cm.requestNetwork(request, cb, 20_000) // 20s timeout
+            // System Wi-Fi settings establish a persistent internet connection.
+            showConnecting(false)
+            startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
         } else {
-            // Legacy: configure and enable
             legacyConnect(item, pw)
         }
     }
@@ -352,6 +437,7 @@ class SettingsFragment : Fragment() {
             val config = WifiConfiguration().apply {
                 SSID = "\"${item.ssid}\""
                 when (item.security) {
+                    Security.ENTERPRISE -> error("Enterprise networks require system settings")
                     Security.OPEN -> {
                         allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE)
                     }
@@ -376,8 +462,11 @@ class SettingsFragment : Fragment() {
             if (ok) {
                 // Give it a moment and declare success
                 binding.root.postDelayed({
+                    if (_binding == null) return@postDelayed
                     showConnecting(false)
-                    showConnected(true)
+                    val connected = wifiManager.connectionInfo?.ssid?.trim('"') == item.ssid
+                    showConnected(connected)
+                    if (!connected) showError("Connection not confirmed. Check the password and try again.")
                 }, 2000)
             } else {
                 showConnecting(false); showError("Unable to connect.")
@@ -416,10 +505,13 @@ class SettingsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        scanHandler.removeCallbacksAndMessages(null)
         scanReceiver?.let { requireContext().unregisterReceiver(it) }
         scanReceiver = null
         pendingCallback?.let { cm.unregisterNetworkCallback(it) }
         pendingCallback = null
+        inlineKeyboard?.dispose()
+        inlineKeyboard = null
         _binding = null
     }
 
@@ -428,6 +520,7 @@ class SettingsFragment : Fragment() {
     private fun parseSecurity(sr: ScanResult): Security {
         val caps = sr.capabilities ?: return Security.OPEN
         return when {
+            caps.contains("EAP", true) -> Security.ENTERPRISE
             caps.contains("WEP", true) -> Security.WEP
             caps.contains("WPA3", true) -> Security.WPA3
             caps.contains("WPA2", true) && caps.contains("WPA", true) -> Security.WPA_MIXED
@@ -439,7 +532,7 @@ class SettingsFragment : Fragment() {
 
     data class WifiItem(val ssid: String, val security: Security, val rssi: Int)
 
-    enum class Security { OPEN, WEP, WPA2, WPA3, WPA_MIXED }
+    enum class Security { OPEN, WEP, WPA2, WPA3, WPA_MIXED, ENTERPRISE }
 
     private inner class NetworksAdapter(
         private val items: List<WifiItem>,
@@ -462,6 +555,10 @@ class SettingsFragment : Fragment() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
             val v = layoutInflater.inflate(R.layout.item_wifi, parent, false)
+            v.setOnFocusChangeListener { row, focused ->
+                row.animate().scaleX(if (focused) 1.015f else 1f)
+                    .scaleY(if (focused) 1.015f else 1f).setDuration(140).start()
+            }
             return VH(v)
         }
 
@@ -489,22 +586,19 @@ class SettingsFragment : Fragment() {
             holder.root.isFocusable = true
             holder.root.isFocusableInTouchMode = true
 
-            binding.inputWifiPassword.requestFocus()
+
         }
 
         override fun getItemCount() = items.size
     }
 
-    // Use your existing helper from earlier responses
     private fun wireDpadKeyboard(target: android.widget.EditText, title: String) {
         target.showSoftInputOnFocus = false
+        target.setOnClickListener { inlineKeyboard?.open(target, title) }
         target.setOnKeyListener { _, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
-                DpadKeyboardDialogFragment
-                    .newInstance(title, target.text?.toString() ?: "") { newText ->
-                        target.setText(newText)
-                    }
-                    .show(parentFragmentManager, "dpadkbd")
+            if (event.action == KeyEvent.ACTION_DOWN &&
+                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+                inlineKeyboard?.open(target, title)
                 true
             } else false
         }

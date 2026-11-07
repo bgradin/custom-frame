@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import com.bgradin.customframe.data.DropboxRepository
 import com.bgradin.customframe.data.Prefs
 import com.bgradin.customframe.util.SyncLock
+import com.bgradin.customframe.util.PhotoStorage
 
 class PhotoSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     private val TAG = "PhotoSyncWorker";
@@ -15,29 +16,28 @@ class PhotoSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
         val prefs = Prefs(applicationContext)
         if (prefs.dropboxToken.isBlank()) return Result.success()
 
-        val ran = SyncLock.tryWithLock(applicationContext) {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            var result: Result = Result.retry()
             try {
-                Log.i(TAG, "Starting Dropbox sync...");
-                Log.i(TAG, "Detecting files in ${prefs.dropboxFolder}")
-
-                val repo = DropboxRepository(applicationContext, prefs.dropboxToken)
-                val all = repo.listAllPhotosRecursively(prefs.dropboxFolder.ifBlank { "/" })
-                Log.i(TAG, "Found ${all.size} files");
-
-                Log.i(TAG, "Choosing 200 photos and downloading...")
-                repo.chooseAndDownloadBatch(all, 2.0, 200)
-
-                Log.i(TAG, "Done!")
-                Result.success()
-            } catch (t: Throwable) {
-                Log.e(TAG, "An error occurred during Dropbox sync", t);
+                SyncLock.tryWithLock(applicationContext) {
+                    val repo = DropboxRepository(applicationContext, prefs.dropboxToken)
+                    val all = repo.listAllPhotosRecursively(prefs.dropboxFolder)
+                    val limit = prefs.photoSyncLimit.takeIf { it > 0 }
+                        ?: PhotoStorage.automaticLimit(applicationContext.filesDir.usableSpace)
+                    // Zero space must not turn a populated offline library into an empty batch.
+                    if (limit == 0 && all.isNotEmpty()) throw java.io.IOException("Insufficient photo storage")
+                    repo.chooseAndDownloadBatch(all, 2.0, limit)
+                    prefs.lastSyncAt = System.currentTimeMillis()
+                    result = Result.success()
+                }
+                result
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (e: Exception) {
+                Log.e(TAG, "Dropbox sync failed", e)
                 Result.retry()
-            } finally {
-                prefs.lastSyncAt = System.currentTimeMillis()
             }
         }
-
-        return Result.success()
     }
 
     companion object {

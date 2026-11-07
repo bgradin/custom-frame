@@ -11,15 +11,18 @@ data class PhotoMeta(val id: String, val lastShownAt: Long?)
 fun weight(lastShownAt: Long?, now: Long, alpha: Double): Double {
     val ageSec = if (lastShownAt == null) 1e9 else (now - lastShownAt).coerceAtLeast(0) / 1000.0
     // More age => larger weight. Exponential scaled by alpha.
-    return exp(alpha * ageSec / (24*3600.0))
+    return exp((alpha * ageSec / (24*3600.0)).coerceIn(-700.0, 700.0))
 }
 
 fun weightedPick(ids: List<PhotoMeta>, count: Int, alpha: Double, now: Long): List<String> {
-    if (ids.isEmpty()) return emptyList()
+    require(alpha.isFinite() && alpha >= 0)
+    if (count <= 0 || ids.isEmpty()) return emptyList()
     val mutable = ids.toMutableList()
     val out = mutableListOf<String>()
     repeat(count.coerceAtMost(mutable.size)) {
-        val w = mutable.map { weight(it.lastShownAt, now, alpha) }
+        val raw = mutable.map { weight(it.lastShownAt, now, alpha) }
+        val maximum = raw.maxOrNull()!!
+        val w = raw.map { it / maximum }
         val total = w.sum()
         var r = Math.random() * total
         var chosenIdx = 0

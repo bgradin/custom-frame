@@ -22,11 +22,23 @@ class Prefs(ctx: Context) {
         get() = sp.getString("dropboxFolder", "/") ?: "/"
         set(v) = sp.edit { putString("dropboxFolder", v) }
 
-    var slideIntervalMs: Long
-        get() = sp.getLong("slideIntervalMs", 7000)
-        set(v) = sp.edit { putLong("slideIntervalMs", v) }
+    // Zero means automatic; recomputed from available storage at each sync.
+    var photoSyncLimit: Int
+        get() = sp.getInt("photoSyncLimit", 0).coerceIn(0, 200)
+        set(v) = sp.edit { putInt("photoSyncLimit", v.coerceIn(0, 200)) }
 
     var lastSyncAt: Long
         get() = sp.getLong("lastSyncAt", 0L)
         set(v) = sp.edit { putLong("lastSyncAt", v).apply() }
+    var wakeWindowEnabled: Boolean
+        get() = sp.getBoolean("wakeWindowEnabled", true)
+        set(v) = sp.edit { putBoolean("wakeWindowEnabled", v) }
+
+    var wakeStartMinutes: Int
+        get() = sp.getInt("wakeStartMinutes", 8 * 60)
+        set(v) = sp.edit { putInt("wakeStartMinutes", v) }
+
+    var wakeEndMinutes: Int
+        get() = sp.getInt("wakeEndMinutes", 22 * 60)
+        set(v) = sp.edit { putInt("wakeEndMinutes", v) }
 }
