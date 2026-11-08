@@ -30,11 +30,11 @@ object FramePower {
     private fun state(context: Context) = context.getSharedPreferences("framePower", Context.MODE_PRIVATE)
     private fun interactive(context: Context) = context.getSystemService(PowerManager::class.java).isInteractive
 
-    private data class PowerProfile(val version: Long, val disabled: Set<String>)
+    private data class DeviceProfile(val version: Long, val disabled: Set<String>)
 
-    private fun profiles(context: Context): List<PowerProfile> =
-        context.assets.list("power-profiles").orEmpty().filter { it.endsWith(".json") }.map { name ->
-            val json = context.assets.open("power-profiles/$name").bufferedReader().use { JSONObject(it.readText()) }
+    private fun profiles(context: Context): List<DeviceProfile> =
+        context.assets.list("device-profiles").orEmpty().filter { it.endsWith(".json") }.map { name ->
+            val json = context.assets.open("device-profiles/$name").bufferedReader().use { JSONObject(it.readText()) }
             require(json.getString("Package") == NIX && json.getString("Protocol") == "nixplay-broadcast-v1")
             fun names(key: String): List<String> = json.getJSONArray(key).let { array ->
                 (0 until array.length()).map { array.getString(it) }
@@ -43,7 +43,7 @@ object FramePower {
             val disabled = names("DisabledComponents")
             require(power.size == 2 && power.toSet() == setOf(SLEEP, WAKE))
             require(disabled.isNotEmpty() && disabled.size == disabled.toSet().size && disabled.none { it in power })
-            PowerProfile(json.getLong("VersionCode"), disabled.toSet())
+            DeviceProfile(json.getLong("VersionCode"), disabled.toSet())
         }
 
     /** Require a contributed profile plus verified isolation of installed components. */
@@ -82,8 +82,8 @@ object FramePower {
         } catch (_: SecurityException) {
             false
         } catch (e: Exception) {
-            AppLog.event("power_profile_error", AppLog.failure(e))
-            Log.w("FramePower", "Cannot load power profiles; using display blanking", e)
+            AppLog.event("device_profile_error", AppLog.failure(e))
+            Log.w("FramePower", "Cannot load device profiles; using display blanking", e)
             false
         }
     }

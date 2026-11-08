@@ -11,19 +11,19 @@ foreach ($file in @('provision-common.ps1', 'provision.ps1', 'provision-rollback
 function Assert($Condition, $Message) { if (-not $Condition) { throw $Message } }
 
 # All bundled profiles must validate, with unambiguous version codes and IDs.
-$profiles = @(Get-ChildItem (Join-Path $ProjectRoot 'app/src/main/assets/power-profiles') -Filter '*.json' |
-    ForEach-Object { Read-PowerProfile $_.FullName })
-Assert ($profiles.Count -gt 0) 'No bundled power profiles.'
+$profiles = @(Get-ChildItem (Join-Path $ProjectRoot 'app/src/main/assets/device-profiles') -Filter '*.json' |
+    ForEach-Object { Read-DeviceProfile $_.FullName })
+Assert ($profiles.Count -gt 0) 'No bundled device profiles.'
 Assert (@($profiles.VersionCode | Select-Object -Unique).Count -eq $profiles.Count) 'Ambiguous version codes.'
 Assert (@($profiles.Id | Select-Object -Unique).Count -eq $profiles.Count) 'Duplicate profile IDs.'
 $alternate = $profiles[0] | ConvertTo-Json -Depth 8 | ConvertFrom-Json
 $alternate.VersionCode = 999999
 $alternate.Id = 'test-alternate'
-$validated = Read-PowerProfile -Profile $alternate
+$validated = Read-DeviceProfile -Profile $alternate
 Assert ($validated.VersionCode -eq 999999) 'Alternate versions should not require script changes.'
 $alternate.PowerReceivers = @('unsupported.Receiver')
 $rejected = $false
-try { Read-PowerProfile -Profile $alternate | Out-Null } catch { $rejected = $true }
+try { Read-DeviceProfile -Profile $alternate | Out-Null } catch { $rejected = $true }
 Assert $rejected 'Unsupported receiver protocols must be rejected.'
 
 $script:testVersion = $profiles[0].VersionCode
@@ -32,11 +32,11 @@ function Invoke-Adb {
     if ($Arguments -contains 'run-as') { return 'uid=1000' }
     return "versionCode=$script:testVersion minSdk=25"
 }
-Assert-NixPowerSupport
-Assert ($NixPower.Id -eq $profiles[0].Id) 'Installed version selected the wrong profile.'
+Assert-NixDeviceSupport
+Assert ($NixDeviceProfile.Id -eq $profiles[0].Id) 'Installed version selected the wrong profile.'
 $script:testVersion = 999999
 $rejected = $false
-try { Assert-NixPowerSupport } catch { $rejected = $true }
+try { Assert-NixDeviceSupport } catch { $rejected = $true }
 Assert $rejected 'Unknown versions must fail preflight.'
 
 # Parse per-user overrides, including explicit enable and untouched defaults.
@@ -56,7 +56,7 @@ Dexopt state:
 '@
 }
 $components = @(Get-NixComponentStates)
-Assert ($components.Count -eq (@($NixPower.DisabledComponents).Count + @($NixPower.PowerReceivers).Count)) 'Snapshot must include every changed component.'
+Assert ($components.Count -eq (@($NixDeviceProfile.DisabledComponents).Count + @($NixDeviceProfile.PowerReceivers).Count)) 'Snapshot must include every changed component.'
 Assert (($components | Where-Object Name -match '/com.kitesystems.nix.frame.LaunchActivity$').Enabled -eq 2) 'Disabled override lost.'
 Assert (($components | Where-Object Name -match '/com.kitesystems.nix.frame.powermanagement.SleepReceiver$').Enabled -eq 1) 'Enabled override lost.'
 Assert (($components | Where-Object Name -match '/com.kitesystems.nix.frame.powermanagement.WakeupReceiver$').Enabled -eq 0) 'Another user leaked into snapshot.'
@@ -88,4 +88,4 @@ $script:calls.Clear()
 $snapshot.Schema = 3
 Restore-Frame $snapshot
 Assert ($script:calls -contains 'component:com.kitesystems.nix.frame/com.kitesystems.nix.frame.LaunchActivity=2') 'Schema 3 rollback lost component states.'
-Write-Host 'Power profiles, frame script parsing, component snapshots, and schema 1/2/3 rollback checks passed.'
+Write-Host 'Device profiles, frame script parsing, component snapshots, and schema 1/2/3 rollback checks passed.'

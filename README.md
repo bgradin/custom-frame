@@ -41,7 +41,7 @@ Run from Windows PowerShell in the project root with the frame connected and aut
 .\scripts\provision.ps1
 ```
 
-Setup requires Android user 0, API 25+, both Nixplay packages (`com.kitesystems.nix.frame` and `com.kitesystems.nix.prod`), and `cmd package set-home-activity`. Hardware sleep requires a matching bundled power profile and existing debuggable `run-as` access. Unknown versions are rejected before setup changes; normal APK installation remains available with display blanking as the fallback. See the supported versions and contribution guide below.
+Setup requires Android user 0, API 25+, both Nixplay packages (`com.kitesystems.nix.frame` and `com.kitesystems.nix.prod`), and `cmd package set-home-activity`. Hardware sleep requires a matching bundled device profile and existing debuggable `run-as` access. Unknown versions are rejected before setup changes; normal APK installation remains available with display blanking as the fallback. See the supported versions and contribution guide below.
 
 The script builds and installs the debug APK, saves the original HOME and package/component states to `.rollback/<serial>/state.json`, and makes Custom Frame HOME. It disables Nixplay UI, background services, non-power receivers, and the companion package, retaining only sleep/wake receivers. Nixplay cloud features, motion wake, updates, and scheduling become unavailable. The vendor process still initializes for power requests, but its UI activities remain disabled.
 
@@ -60,11 +60,11 @@ After provisioning, check rebooting, remote controls, and ADB reconnection.
 
 | Nixplay app version | Version code | Tested hardware                                | Power protocol                            | Profile                                                                       |
 | ------------------- | ------------ | ---------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------- |
-| 8.2.35              | 26071516     | Nixplay Smart Digital Picture Frame, 10.1-inch | SleepReceiver / WakeupReceiver broadcasts | [nixplay-8.2.35.json](app/src/main/assets/power-profiles/nixplay-8.2.35.json) |
+| 8.2.35              | 26071516     | Nixplay Smart Digital Picture Frame, 10.1-inch | SleepReceiver / WakeupReceiver broadcasts | [nixplay-8.2.35.json](app/src/main/assets/device-profiles/nixplay-8.2.35.json) |
 
 Profiles match the installed **app version code**, not a device serial number. Hardware listed here records testing evidence; it does not guarantee that every device with that app version behaves identically. Android API 25+, user 0, package isolation, and exact wake alarms remain requirements for hardware sleep. Other Android devices can use the slideshow and display blanking without Nixplay provisioning.
 
-To support your version, copy the closest profile into `app/src/main/assets/power-profiles/`, give it a unique ID and exact version code, inspect its APK components, and update the disabled-component list. Keep the sleep/wake receivers enabled. Run setup with `-CheckOnly`, test setup, scheduled sleep/wake, remote wake, reboot, and rollback on your hardware, then submit the profile, hardware/software test details, and a row in this table. **Do not just change the version number without inspecting and testing the APK.** See [the power profile contribution guide](docs/power-profiles.md) for commands and the PR checklist. Both provisioning and the built app read these same profiles; adding support for another version with the existing receiver protocol requires no Kotlin changes.
+To support your version, copy the closest profile into `app/src/main/assets/device-profiles/`, give it a unique ID and exact version code, inspect its APK components, and update the disabled-component list. Keep the sleep/wake receivers enabled. Run setup with `-CheckOnly`, test setup, scheduled sleep/wake, remote wake, reboot, and rollback on your hardware, then submit the profile, hardware/software test details, and a row in this table. **Do not just change the version number without inspecting and testing the APK.** See [the device profile contribution guide](docs/device-profiles.md) for commands and the PR checklist. Both provisioning and the built app read these same profiles; adding support for another version with the existing receiver protocol requires no Kotlin changes.
 
 ### Roll back provisioning
 

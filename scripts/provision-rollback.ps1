@@ -13,7 +13,9 @@ if ($state.Schema -notin @(1, 2, 3) -or $state.Serial -ne $script:Serial -or $st
 }
 if ($state.Schema -eq 3) {
     # Restore against the captured profile, even after repository profiles change.
-    $NixPower = Read-PowerProfile -Profile $state.PowerProfile
+    # Older schema 3 snapshots used the PowerProfile field name.
+    $savedProfile = if ($state.PSObject.Properties['DeviceProfile']) { $state.DeviceProfile } else { $state.PowerProfile }
+    $NixDeviceProfile = Read-DeviceProfile -Profile $savedProfile
 }
 if ($state.Home -notmatch '^[\w.$]+/[\w.$]+$') { throw 'Invalid saved HOME component.' }
 if (@($state.Packages).Count -ne 2) { throw 'Invalid saved package list.' }
@@ -22,10 +24,10 @@ foreach ($name in $NixPackages) {
     if ($entry.Count -ne 1 -or "$($entry[0].Enabled)" -notmatch '^[0-4]$') { throw "Invalid saved state for $name" }
 }
 if ($state.Schema -in @(2, 3)) {
-    $expected = @($NixPower.DisabledComponents) + @($NixPower.PowerReceivers)
+    $expected = @($NixDeviceProfile.DisabledComponents) + @($NixDeviceProfile.PowerReceivers)
     if (@($state.Components).Count -ne $expected.Count) { throw 'Invalid saved component list.' }
     foreach ($name in $expected) {
-        $component = "$($NixPower.Package)/$name"
+        $component = "$($NixDeviceProfile.Package)/$name"
         $entry = @($state.Components | Where-Object { $_.Name -eq $component })
         if ($entry.Count -ne 1 -or "$($entry[0].Enabled)" -notmatch '^[0-2]$') {
             throw "Invalid saved state for $component"

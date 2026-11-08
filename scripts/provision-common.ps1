@@ -6,13 +6,13 @@ $FrameHome = "$FrameApp/.MainActivity"
 $NixPackages = @('com.kitesystems.nix.frame', 'com.kitesystems.nix.prod')
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 # The legacy manifest is retained only for schema 2 rollback snapshots.
-$NixPower = Get-Content -Raw (Join-Path $ProjectRoot 'nixplay-power-components.json') | ConvertFrom-Json
+$NixDeviceProfile = Get-Content -Raw (Join-Path $ProjectRoot 'nixplay-power-components.json') | ConvertFrom-Json
 
-function Read-PowerProfile {
+function Read-DeviceProfile {
     param([string]$Path, $Profile)
     if ($Path) { $Profile = Get-Content -Raw $Path | ConvertFrom-Json }
     if ($profile.Protocol -ne 'nixplay-broadcast-v1' -or $profile.Package -ne 'com.kitesystems.nix.frame' -or
-        "$($profile.VersionCode)" -notmatch '^[1-9][0-9]*$' -or -not $profile.Id) { throw "Invalid power profile: $Path" }
+        "$($profile.VersionCode)" -notmatch '^[1-9][0-9]*$' -or -not $profile.Id) { throw "Invalid device profile: $Path" }
     $required = @('com.kitesystems.nix.frame.powermanagement.SleepReceiver', 'com.kitesystems.nix.frame.powermanagement.WakeupReceiver')
     if (@($profile.PowerReceivers).Count -ne 2 -or @($required | Where-Object { $_ -notin $profile.PowerReceivers }).Count) {
         throw "Unsupported power receivers in $Path"
@@ -23,21 +23,21 @@ function Read-PowerProfile {
     return $profile
 }
 
-function Assert-NixPowerSupport {
+function Assert-NixDeviceSupport {
     $dump = Invoke-Adb @('shell', 'dumpsys', 'package', 'com.kitesystems.nix.frame')
     if ($dump -notmatch '\bversionCode=(\d+)\b') { throw 'Cannot determine installed Nixplay version.' }
     $version = [long]$Matches[1]
-    $profiles = @(Get-ChildItem (Join-Path $ProjectRoot 'app/src/main/assets/power-profiles') -Filter '*.json' |
-        ForEach-Object { Read-PowerProfile $_.FullName } | Where-Object { $_.VersionCode -eq $version })
-    if ($profiles.Count -ne 1) { throw "Expected one power profile for Nixplay version $version; found $($profiles.Count). See docs/power-profiles.md to contribute support." }
-    $script:NixPower = $profiles[0]
-    Write-Host "Power profile: $($NixPower.Id)"
-    $identity = Invoke-Adb @('shell', 'run-as', $NixPower.Package, 'id')
+    $profiles = @(Get-ChildItem (Join-Path $ProjectRoot 'app/src/main/assets/device-profiles') -Filter '*.json' |
+        ForEach-Object { Read-DeviceProfile $_.FullName } | Where-Object { $_.VersionCode -eq $version })
+    if ($profiles.Count -ne 1) { throw "Expected one device profile for Nixplay version $version; found $($profiles.Count). See docs/device-profiles.md to contribute support." }
+    $script:NixDeviceProfile = $profiles[0]
+    Write-Host "Device profile: $($NixDeviceProfile.Id)"
+    $identity = Invoke-Adb @('shell', 'run-as', $NixDeviceProfile.Package, 'id')
     if ($identity -notmatch 'uid=') { throw 'Nixplay run-as access is required to isolate its UI without root.' }
 }
 
 function Get-NixComponentStates {
-    $dump = Invoke-Adb @('shell', 'dumpsys', 'package', $NixPower.Package)
+    $dump = Invoke-Adb @('shell', 'dumpsys', 'package', $NixDeviceProfile.Package)
     # Scope to user 0; enabled/disabled overrides are stored as component lists.
     $user = [regex]::Match($dump, '(?ms)^    User 0:.*?(?=^    User \d+:|^\S|\z)').Value
     if (-not $user) { throw 'Cannot read Nixplay user 0 component overrides.' }
@@ -49,9 +49,9 @@ function Get-NixComponentStates {
             if ($name) { $overrides[$name] = $value }
         }
     }
-    foreach ($name in @($NixPower.DisabledComponents) + @($NixPower.PowerReceivers)) {
+    foreach ($name in @($NixDeviceProfile.DisabledComponents) + @($NixDeviceProfile.PowerReceivers)) {
         $value = if ($overrides.ContainsKey($name)) { $overrides[$name] } else { 0 }
-        [pscustomobject]@{ Name = "$($NixPower.Package)/$name"; Enabled = $value }
+        [pscustomobject]@{ Name = "$($NixDeviceProfile.Package)/$name"; Enabled = $value }
     }
 }
 
@@ -60,26 +60,26 @@ function Set-NixComponentState {
     if ($Component -notmatch '^com\.kitesystems\.nix\.frame/[\w.$]+$') { throw 'Invalid Nixplay component.' }
     $commands = @{ 0 = 'default-state'; 1 = 'enable'; 2 = 'disable' }
     if (-not $commands.ContainsKey($State)) { throw 'Invalid component state.' }
-    $result = Invoke-Adb @('shell', 'run-as', $NixPower.Package, 'pm', $commands[$State], '--user', '0', "'$Component'")
+    $result = Invoke-Adb @('shell', 'run-as', $NixDeviceProfile.Package, 'pm', $commands[$State], '--user', '0', "'$Component'")
     if ($result -notmatch 'new state:') { throw "Cannot change component state: $result" }
 }
 
 function Set-NixPowerOnly {
-    Set-PackageState $NixPower.Package 1
-    foreach ($name in $NixPower.DisabledComponents) {
-        Set-NixComponentState "$($NixPower.Package)/$name" 2
+    Set-PackageState $NixDeviceProfile.Package 1
+    foreach ($name in $NixDeviceProfile.DisabledComponents) {
+        Set-NixComponentState "$($NixDeviceProfile.Package)/$name" 2
     }
-    foreach ($name in $NixPower.PowerReceivers) {
-        Set-NixComponentState "$($NixPower.Package)/$name" 1
+    foreach ($name in $NixDeviceProfile.PowerReceivers) {
+        Set-NixComponentState "$($NixDeviceProfile.Package)/$name" 1
     }
     $actual = @(Get-NixComponentStates)
     foreach ($item in $actual) {
         $class = $item.Name.Split('/')[1]
-        $wanted = if ($NixPower.PowerReceivers -contains $class) { 1 } else { 2 }
+        $wanted = if ($NixDeviceProfile.PowerReceivers -contains $class) { 1 } else { 2 }
         if ($item.Enabled -ne $wanted) { throw "Isolation did not apply to $($item.Name)" }
     }
     # Clear old timers/services. The next explicit power request can cold-start Nixplay.
-    Invoke-Adb @('shell', 'am', 'force-stop', $NixPower.Package) | Out-Null
+    Invoke-Adb @('shell', 'am', 'force-stop', $NixDeviceProfile.Package) | Out-Null
     Set-PackageState 'com.kitesystems.nix.prod' 3
 }
 
@@ -187,12 +187,12 @@ function Restore-Frame {
     $failures = @()
     # Schema 2 snapshots also restore individual overrides changed for power-only mode.
     if ($State.Schema -in @(2, 3)) {
-        try { Set-PackageState $NixPower.Package 1 } catch { $failures += $_.Exception.Message }
+        try { Set-PackageState $NixDeviceProfile.Package 1 } catch { $failures += $_.Exception.Message }
         foreach ($component in $State.Components) {
             try { Set-NixComponentState $component.Name ([int]$component.Enabled) }
             catch { $failures += $_.Exception.Message }
         }
-        try { Invoke-Adb @('shell', 'am', 'force-stop', $NixPower.Package) | Out-Null }
+        try { Invoke-Adb @('shell', 'am', 'force-stop', $NixDeviceProfile.Package) | Out-Null }
         catch { $failures += $_.Exception.Message }
     }
     foreach ($package in $State.Packages) {
@@ -211,7 +211,7 @@ function Restore-Frame {
         }
         if ($State.Schema -in @(2, 3)) {
             Invoke-Adb @('shell', 'am', 'broadcast', '--include-stopped-packages',
-                '-a', 'com.kitesystems.nix.ACTION_WAKEUP', '-n', "$($NixPower.Package)/.powermanagement.WakeupReceiver",
+                '-a', 'com.kitesystems.nix.ACTION_WAKEUP', '-n', "$($NixDeviceProfile.Package)/.powermanagement.WakeupReceiver",
                 '--es', 'WakeupReceiver', 'CustomFrameRollback') | Out-Null
         }
     } catch { $failures += $_.Exception.Message }

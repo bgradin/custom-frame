@@ -1,4 +1,4 @@
-# Contributing a power profile
+# Contributing a device profile
 
 The slideshow supports Android API 25+. Hardware power control is an optional Nixplay integration. Profiles describe inspected APK versions; they are not device backups. Never commit serials, credentials, pairing information, or `.rollback/`.
 
@@ -21,7 +21,7 @@ Pull the APK from the reported path with `adb pull` and inspect its manifest wit
 
 ## Add the profile
 
-Copy `app/src/main/assets/power-profiles/nixplay-8.2.35.json` to a descriptive new JSON filename. Set a unique `Id`, exact numeric `VersionCode`, and `TestedHardware` entries with model, Android version, firmware/build identifier, app version and test notes. Retain existing profiles. One profile per version code is supported; append hardware evidence to an existing profile for the same APK. Conflicting implementations sharing a version code need a code change to introduce a stronger discriminator, not duplicate profiles.
+Copy `app/src/main/assets/device-profiles/nixplay-8.2.35.json` to a descriptive new JSON filename. Set a unique `Id`, exact numeric `VersionCode`, and `TestedHardware` entries with model, Android version, firmware/build identifier, app version and test notes. Retain existing profiles. One profile per version code is supported; append hardware evidence to an existing profile for the same APK. Conflicting implementations sharing a version code need a code change to introduce a stronger discriminator, not duplicate profiles.
 
 `Package` and `Protocol` currently support `com.kitesystems.nix.frame` and `nixplay-broadcast-v1`. This protocol sends explicit ACTION_SLEEP/ACTION_WAKEUP broadcasts to the existing SleepReceiver/WakeupReceiver classes, with the corresponding receiver extra and POWERBUTTON_PRESSED=true. Changed packages, receiver names, permissions, or broadcast semantics require an adapter change and testing, not merely a JSON entry.
 
@@ -36,4 +36,4 @@ Copy `app/src/main/assets/power-profiles/nixplay-8.2.35.json` to a descriptive n
 5. Run rollback and verify original HOME, package/component states and screen wake. Preserve the local snapshot until this succeeds.
 6. Submit the profile, README table row and sanitized test results, including model, app/version code, Android/API version, firmware identifier and limitations.
 
-Schema 3 rollback snapshots embed the selected profile so restoration survives profile edits or removal. Schema 1/2 snapshots remain supported; the root `nixplay-power-components.json` is frozen for schema 2 compatibility. Keep actual `.rollback/` data local.
+Schema 3 rollback snapshots embed the selected profile as `DeviceProfile` so restoration survives profile edits or removal. Rollback also accepts the legacy `PowerProfile` field in existing schema 3 snapshots. Schema 1/2 snapshots remain supported; the root `nixplay-power-components.json` is frozen for schema 2 compatibility. Keep actual `.rollback/` data local.

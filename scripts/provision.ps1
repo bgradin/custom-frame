@@ -8,7 +8,7 @@ $apiText = Invoke-Adb @('shell', 'getprop', 'ro.build.version.sdk')
 if ($apiText -notmatch '^\d+$' -or [int]$apiText -lt 25) { throw "Android API 25+ required; found $apiText" }
 $packageHelp = Invoke-Adb @('shell', 'cmd', 'package')
 if ($packageHelp -notmatch 'set-home-activity') { throw 'Firmware does not support set-home-activity.' }
-Assert-NixPowerSupport
+Assert-NixDeviceSupport
 $components = @(Get-NixComponentStates)
 $originalHome = Get-Home -AllowResolver
 $packages = @($NixPackages | ForEach-Object {
@@ -58,7 +58,7 @@ if (-not (Test-Path $apk)) { throw 'Build did not produce the expected APK.' }
 
 $state = [pscustomobject]@{
     Schema = 3
-    PowerProfile = $NixPower
+    DeviceProfile = $NixDeviceProfile
     Serial = $script:Serial
     Fingerprint = $script:Fingerprint
     CapturedUtc = [DateTime]::UtcNow.ToString('o')
