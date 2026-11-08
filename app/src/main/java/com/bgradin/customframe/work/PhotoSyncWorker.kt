@@ -16,7 +16,7 @@ class PhotoSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
 
     override suspend fun doWork(): Result {
         val prefs = Prefs(applicationContext)
-        if (prefs.dropboxToken.isBlank()) {
+        if (prefs.dropboxToken.isBlank() && com.bgradin.customframe.data.FrameServer(applicationContext).origin.isBlank()) {
             AppLog.event("sync_skipped", "reason=no_token")
             return Result.success()
         }
@@ -26,8 +26,16 @@ class PhotoSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
             var result: Result = Result.retry()
             try {
                 val acquired = SyncLock.tryWithLock(applicationContext) {
-                    val repo = DropboxRepository(applicationContext, prefs.dropboxToken)
-                    val all = repo.listAllPhotosRecursively(prefs.dropboxFolder)
+                    val server = com.bgradin.customframe.data.FrameServer(applicationContext)
+                    var token = if (server.origin.isBlank()) prefs.dropboxToken else server.photoToken()
+                    var repo = DropboxRepository(applicationContext, token)
+                    val all = try { repo.listAllPhotosRecursively(prefs.dropboxFolder) }
+                    catch (e: com.dropbox.core.InvalidAccessTokenException) {
+                        if (server.origin.isBlank()) throw e
+                        token = server.photoToken(force = true)
+                        repo = DropboxRepository(applicationContext, token)
+                        repo.listAllPhotosRecursively(prefs.dropboxFolder)
+                    }
                     val limit = prefs.photoSyncLimit.takeIf { it > 0 }
                         ?: PhotoStorage.automaticLimit(applicationContext.filesDir.usableSpace)
                     // Zero space must not turn a populated offline library into an empty batch.
@@ -44,8 +52,8 @@ class PhotoSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(
                 AppLog.event("sync_cancelled", "id=$id")
                 throw cancelled
             } catch (e: Exception) {
-                AppLog.event("sync_retry", "id=$id ${AppLog.failure(e)}")
-                Log.e(TAG, "Dropbox sync failed", e)
+                AppLog.event("sync_retry", "id=$id reason=sync_failed")
+                Log.e(TAG, "Photo sync failed; retry scheduled")
                 Result.retry()
             }
         }

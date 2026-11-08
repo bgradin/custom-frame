@@ -12,14 +12,19 @@ android {
         applicationId = "com.bgradin.customframe"
         minSdk = 25
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Opt in for frames already provisioned with this machine's debug signing identity.
+    // Do not generate a new key for those frames: Android would reject the update.
     buildTypes {
         release {
+            if (providers.gradleProperty("frameProvisionedSigning").orNull == "true") {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -39,6 +44,25 @@ android {
     }
 }
 
+// Keep a flat, versioned copy of every assembled APK for distribution.
+androidComponents {
+    onVariants { variant ->
+        val capitalizedName = variant.name.replaceFirstChar { it.uppercaseChar() }
+        val versionName = variant.outputs.first().versionName
+        val exportApks = tasks.register<Copy>("export${capitalizedName}Apks") {
+            from(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK))
+            include("*.apk")
+            into(rootProject.layout.buildDirectory.dir("distributions/custom-frame"))
+            rename { filename ->
+                "custom-frame-${versionName.get()}-${filename.removePrefix("app-")}"
+            }
+        }
+        tasks.matching { it.name == "assemble$capitalizedName" }.configureEach {
+            finalizedBy(exportApks)
+        }
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
@@ -51,6 +75,7 @@ dependencies {
 
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
 
     // WorkManager (periodic background sync)
     implementation("androidx.work:work-runtime-ktx:2.9.1")

@@ -200,6 +200,26 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/settings_photos_help"/>
+                <EditText android:id="@+id/inputServerDomain" style="@style/Settings.Input"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:hint="Server domain (https://www.gradinware.com)" android:inputType="textUri"
+                    android:singleLine="true" android:importantForAutofill="no" android:saveEnabled="false"/>
+                <EditText android:id="@+id/inputAuthKey" style="@style/Settings.Input"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:hint="Auth key" android:inputType="textPassword"
+                    android:singleLine="true" android:importantForAutofill="no" android:saveEnabled="false"/>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Photo source" android:textColor="@color/settings_text"/>
+                <Spinner android:id="@+id/photoSource" android:layout_width="match_parent"
+                    android:layout_height="48dp"/>
+                <TextView android:id="@+id/serverStatus" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:textColor="@color/settings_text"/>
+                <Button android:id="@+id/btnRefreshServer" style="@style/Settings.SecondaryButton"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Save and refresh server"/>
+                <Button android:id="@+id/btnCheckUpdate" style="@style/Settings.SecondaryButton"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="Check for app update"/>
                 <TextView
                     android:text="@string/dropbox_access_token"
                     android:layout_width="wrap_content"

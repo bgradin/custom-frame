@@ -40,6 +40,10 @@ class App : Application() {
             addAction(android.content.Intent.ACTION_SCREEN_ON)
         }, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
 
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            "server_startup_refresh", androidx.work.ExistingWorkPolicy.KEEP,
+            androidx.work.OneTimeWorkRequestBuilder<com.bgradin.customframe.work.ServerRefreshWorker>().build())
+
         // WorkManager schedules hourly sync when connectivity is available.
         val req = PeriodicWorkRequestBuilder<PhotoSyncWorker>(1, TimeUnit.HOURS)
             .setConstraints(androidx.work.Constraints.Builder()

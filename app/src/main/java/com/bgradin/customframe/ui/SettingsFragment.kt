@@ -185,6 +185,45 @@ class SettingsFragment : Fragment() {
         }
 
         binding.inputDropboxToken.setText(prefs.dropboxToken)
+        val server = com.bgradin.customframe.data.FrameServer(requireContext())
+        binding.inputServerDomain.setText(server.origin)
+        binding.inputAuthKey.setText(server.authKey)
+        wireDpadKeyboard(binding.inputServerDomain, "Server domain")
+        wireDpadKeyboard(binding.inputAuthKey, "Auth key")
+        binding.inputServerDomain.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                binding.inputAuthKey.setText("")
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        showServerState()
+        binding.btnRefreshServer.setOnClickListener { saveServer() }
+        binding.btnCheckUpdate.setOnClickListener {
+            val context = requireContext().applicationContext
+            binding.btnCheckUpdate.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { com.bgradin.customframe.data.AppUpdater(context).download() } }
+                if (_binding == null) return@launch
+                binding.btnCheckUpdate.isEnabled = true
+                if (result.isFailure) server.setStatus("Update failed. Check server, APK publication, compatibility, and signing.")
+                showServerState()
+                result.getOrNull()?.let { file ->
+                    try {
+                        if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
+                            server.setStatus("Allow app installation in system settings, then check again")
+                            startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                android.net.Uri.parse("package:${context.packageName}")))
+                        } else {
+                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.updates", file)
+                            startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                        }
+                    } catch (_: Exception) { server.setStatus("Installer unavailable; use the ADB update path") }
+                    showServerState()
+                }
+            }
+        }
         binding.inputDropboxFolder.setText(prefs.dropboxFolder)
         binding.inputPhotoSyncLimit.setText(prefs.photoSyncLimit.takeIf { it > 0 }?.toString().orEmpty())
 
@@ -270,7 +309,39 @@ class SettingsFragment : Fragment() {
         return false
     }
 
+    private fun showServerState() {
+        val server = com.bgradin.customframe.data.FrameServer(requireContext())
+        binding.serverStatus.text = server.status
+        binding.inputDropboxToken.isEnabled = server.origin.isBlank()
+        val config = server.cached()
+        binding.photoSource.adapter = android.widget.ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item,
+            listOf(if (server.origin.isBlank()) "Dropbox (manual)" else config?.name ?: "No supported source — refresh server"))
+    }
+
+    private fun saveServer(afterSave: (() -> Unit)? = null) {
+        val context = requireContext().applicationContext
+        val domain = binding.inputServerDomain.text.toString().trim()
+        val key = binding.inputAuthKey.text.toString().trim()
+        binding.btnRefreshServer.isEnabled = false
+        binding.btnSave.isEnabled = false
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { com.bgradin.customframe.data.FrameServer(context).save(domain, key) }
+            }
+            if (_binding == null) return@launch
+            binding.btnRefreshServer.isEnabled = true
+            binding.btnSave.isEnabled = true
+            showServerState()
+            if (result.isFailure) binding.serverStatus.text = "Server setup failed. Check HTTPS origin, auth key, and network. Previous configuration retained."
+            else afterSave?.invoke()
+        }
+    }
+
     private fun saveSettings() {
+        saveServer { persistSettings() }
+    }
+
+    private fun persistSettings() {
         val limitText = binding.inputPhotoSyncLimit.text?.toString().orEmpty().trim()
         val limit = if (limitText.isEmpty()) 0 else limitText.toIntOrNull()
         if (limit == null || (limitText.isNotEmpty() && limit !in 1..200)) {
@@ -295,7 +366,8 @@ class SettingsFragment : Fragment() {
         val oldToken = prefs.dropboxToken
         val oldFolder = prefs.dropboxFolder
 
-        prefs.dropboxToken = binding.inputDropboxToken.text?.toString().orEmpty().trim()
+        if (com.bgradin.customframe.data.FrameServer(requireContext()).origin.isBlank())
+            prefs.dropboxToken = binding.inputDropboxToken.text?.toString().orEmpty().trim()
         val folder = binding.inputDropboxFolder.text?.toString().orEmpty().trim().trimEnd('/')
         prefs.dropboxFolder = if (folder.isBlank()) "/" else "/" + folder.trimStart('/')
 
@@ -305,7 +377,7 @@ class SettingsFragment : Fragment() {
         val credsChanged = (prefs.dropboxToken != oldToken) || (prefs.dropboxFolder != oldFolder)
         val tenMinMs = java.util.concurrent.TimeUnit.MINUTES.toMillis(10)
         val stale = (System.currentTimeMillis() - prefs.lastSyncAt) > tenMinMs
-        if (prefs.dropboxToken.isNotBlank() && (credsChanged || limitChanged || stale)) {
+        if ((prefs.dropboxToken.isNotBlank() || com.bgradin.customframe.data.FrameServer(requireContext()).origin.isNotBlank()) && (credsChanged || limitChanged || stale)) {
             val nowReq = OneTimeWorkRequestBuilder<PhotoSyncWorker>()
                 .setConstraints(androidx.work.Constraints.Builder()
                     .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())

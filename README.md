@@ -58,8 +58,8 @@ After provisioning, check rebooting, remote controls, and ADB reconnection.
 
 ### Supported Nixplay configurations
 
-| Nixplay app version | Version code | Tested hardware                                | Power protocol                            | Profile                                                                       |
-| ------------------- | ------------ | ---------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------- |
+| Nixplay app version | Version code | Tested hardware                                | Power protocol                            | Profile                                                                        |
+| ------------------- | ------------ | ---------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
 | 8.2.35              | 26071516     | Nixplay Smart Digital Picture Frame, 10.1-inch | SleepReceiver / WakeupReceiver broadcasts | [nixplay-8.2.35.json](app/src/main/assets/device-profiles/nixplay-8.2.35.json) |
 
 Profiles match the installed **app version code**, not a device serial number. Hardware listed here records testing evidence; it does not guarantee that every device with that app version behaves identically. Android API 25+, user 0, package isolation, and exact wake alarms remain requirements for hardware sleep. Other Android devices can use the slideshow and display blanking without Nixplay provisioning.
@@ -97,6 +97,10 @@ Set `$env:ANDROID_SERIAL = 'SERIAL'` for multiple devices. Updates preserve sett
 ```
 
 Sends `adb reboot`, including with the battery connected; it does not physically disconnect power. Requires an authorized device with Nixplay installed and uses the ADB options above. Allow time for boot and ADB reconnection after the command returns.
+
+## Configure a custom frame server
+
+To implement your own Custom Frame host for photo-provider configuration and app updates, see the [host API documentation](docs/api.md).
 
 ## App settings
 

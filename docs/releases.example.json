@@ -1,0 +1,25 @@
+{
+  "releases": [
+    {
+      "appVersion": "1.0",
+      "appVersionCode": 1,
+      "publishedAt": "2026-11-08T05:54:51Z",
+      "releaseNotes": "Current debug APK snapshot for the rockchip w10f12 frame.",
+      "applicationId": "com.bgradin.customframe",
+      "minSdk": 25,
+      "supportedDevices": [
+        {
+          "manufacturer": "rockchip",
+          "model": "w10f12",
+          "minSdk": 25
+        }
+      ],
+      "download": {
+        "url": "https://frames.example.com/downloads/custom-frame/1/custom-frame.apk",
+        "sizeBytes": 9906250,
+        "sha256": "3dbe92255babdfea7ef883abb81d3ae540b5fb97cdb72bfe524883319b4146be"
+      }
+    }
+  ],
+  "nextCursor": null
+}
