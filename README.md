@@ -89,6 +89,21 @@ This builds your current local source, installs with `adb install -r`, and launc
 
 Set `$env:ANDROID_SERIAL = 'SERIAL'` for multiple devices. Updates preserve settings, photos, HOME, Nixplay configuration, and the rollback snapshot. Keep the same application ID and signing key; resolve signing mismatches with the original key. Do not uninstall or rerun setup for updates.
 
+#### Update through the app
+
+In Custom Frame Settings, configure the server domain and auth key, select **Save and refresh server**, then **Check for app update**. The app downloads and verifies a compatible update before opening Android's installer. Installation requires confirmation; updates are not installed unattended.
+
+On the tested Android 7.1 Nixplay, Android may report that installation from unknown sources is blocked:
+
+1. Select **Settings** in that message to open Android's **Security** settings.
+2. Enable **Unknown sources** ("Allow installation of apps from unknown sources") and accept Android's confirmation.
+3. Return to Custom Frame Settings and select **Check for app update** again if the installer does not resume.
+4. Select **Install** in Android's installer, then open Custom Frame when installation finishes.
+
+On Android 8 or later, allow installation for **Custom Frame** in the **Install unknown apps** settings screen instead, then return and check for updates again.
+
+On Android 7.1, **Unknown sources** is a device-wide setting that stays enabled until you turn it off. You can disable it in Android **Settings → Security** after the update; enable it again for future in-app installations. Custom Frame still verifies the APK's size, SHA-256, package, version, and signing identity before handing it to Android. ADB updates do not require this setting.
+
 ### Restart Android
 
 ```powershell

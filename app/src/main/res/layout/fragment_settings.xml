@@ -202,7 +202,7 @@
                     android:text="@string/settings_photos_help"/>
                 <EditText android:id="@+id/inputServerDomain" style="@style/Settings.Input"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:hint="Server domain (https://www.gradinware.com)" android:inputType="textUri"
+                    android:hint="Server domain" android:inputType="textUri"
                     android:singleLine="true" android:importantForAutofill="no" android:saveEnabled="false"/>
                 <EditText android:id="@+id/inputAuthKey" style="@style/Settings.Input"
                     android:layout_width="match_parent" android:layout_height="wrap_content"

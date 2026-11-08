@@ -178,7 +178,7 @@ When the user checks for updates, the app:
 3. Selects the highest compatible code above the installed version and at or below the recommendation. This can be an older release than the recommendation if that release better matches the device.
 4. Requires enough free storage for the declared APK size plus more than 32 MiB of reserve, then downloads into app-private temporary storage.
 5. Verifies the exact byte count and SHA-256, then checks the APK package, version name/code, minimum SDK, and signing certificates against the installed app and selected record.
-6. Opens Android's installer for user confirmation. Newer Android versions may first require permission to install apps from this source.
+6. Opens Android's installer for user confirmation. Android 7.1 requires the device-wide **Security → Unknown sources** setting; Android 8 or later uses permission to install apps from this source. See [in-app update setup](../README.md#update-through-the-app) for enabling the setting and retrying installation.
 
 Use the same signing key across updates. The current app compares the installed and downloaded certificate sets exactly; do not assume signing-key rotation will be accepted. A release APK signed with a different key from an installed debug APK will fail verification. Hosts distributing their own builds must provide a compatible installation and signing path for their frames.
 
